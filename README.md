@@ -16,9 +16,10 @@ recarga Pix pela Cakto e acompanhamento automático de pedidos.
 - Crédito automático após confirmação do pagamento e reversão idempotente em estorno/chargeback.
 - Histórico, atualização automática, reposição e cancelamento quando disponíveis.
 
-O catálogo principal permanece nativo no Telegram e usa três níveis curtos para celular:
-rede → tipo de serviço → opção. Uma WebApp com cálculo instantâneo pode ser adicionada quando
-houver um domínio HTTPS próprio; a implantação de produção não depende de túnel temporário.
+O catálogo permanece disponível nativamente no Telegram e também no Mini App. A interface
+visual usa o fluxo rede → tipo → serviço → pedido, busca local, cálculo instantâneo e uma
+confirmação final com o preço recalculado pelo servidor. Toda operação autenticada valida o
+`Telegram.WebApp.initData`; dados exibidos no navegador nunca autorizam preço ou usuário.
 
 ## Segurança e consistência financeira
 
@@ -75,10 +76,17 @@ sudo -u maispopular python3 -m venv .venv
 sudo -u maispopular .venv/bin/pip install -r requirements.txt
 sudo chmod 600 .env
 sudo cp deploy/maispopular.service /etc/systemd/system/
+sudo cp deploy/maispopular-webapp.service deploy/maispopular-tunnel.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now maispopular
+sudo chmod 755 deploy/run_quick_tunnel.sh
+sudo systemctl enable --now maispopular maispopular-webapp maispopular-tunnel
 sudo systemctl status maispopular
 ```
+
+O Quick Tunnel gera um endereço HTTPS aleatório. O serviço grava a URL em
+`data/webapp_url.txt`; o bot percebe mudanças e atualiza o botão **Abrir loja** em até 15
+segundos. Esse modo acompanha o padrão dos outros bots na VPS, mas não possui SLA. Para uma
+URL permanente, substitua o Quick Tunnel por um Cloudflare Tunnel nomeado com domínio próprio.
 
 Não execute uma segunda cópia com o mesmo token ou banco. Para backup online, copie o banco
 usando a API de backup do SQLite ou inclua também os arquivos WAL/SHM.
@@ -90,4 +98,6 @@ usando a API de backup do SQLite ou inclua também os arquivos WAL/SHM.
 - [Idempotência da Cakto](https://docs.cakto.com.br/conceitos/idempotencia)
 - [Consulta de pedidos Cakto](https://docs.cakto.com.br/api-reference/orders/retrieve)
 - [Telegram Bot API](https://core.telegram.org/bots/api)
+- [Telegram Mini Apps](https://core.telegram.org/bots/webapps)
+- [Cloudflare Quick Tunnels](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/)
 - [python-telegram-bot](https://docs.python-telegram-bot.org/en/stable/)

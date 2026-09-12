@@ -1,0 +1,23 @@
+[Unit]
+Description=Mais Popular - Cloudflare Quick Tunnel
+After=network-online.target maispopular-webapp.service
+Wants=network-online.target
+Requires=maispopular-webapp.service
+
+[Service]
+Type=simple
+User=maispopular
+Group=maispopular
+ExecStart=/opt/maispopular/deploy/run_quick_tunnel.sh
+Restart=always
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/maispopular/data
+Environment=HOME=/tmp
+
+[Install]
+WantedBy=multi-user.target

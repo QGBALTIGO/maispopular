@@ -18,7 +18,7 @@ async def home(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"<b>Bem-vindo à {e(p.settings.bot_name)}, {e(name)}!</b>\n\n"
         "Escolha uma rede social, confira os detalhes e acompanhe tudo pelo próprio bot.\n\n"
         f"👛 <b>Seu saldo:</b> {money_brl(balance)}",
-        home_rows(p.is_admin(uid(update))))
+        home_rows(p.is_admin(uid(update)), p.settings.webapp_url()))
 
 
 async def identity(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
@@ -55,6 +56,8 @@ class Settings:
     cakto_offers: dict[int, str]
     cakto_pix_expires: int
     fingerprint_secret: str
+    webapp_url_file: Path = Path("data/webapp_url.txt")
+    bot_username: str = "MaisPopularBot"
 
     @classmethod
     def load(cls) -> "Settings":
@@ -113,4 +116,18 @@ class Settings:
             cakto_offers=offers,
             cakto_pix_expires=pix_expires,
             fingerprint_secret=fingerprint_secret,
+            webapp_url_file=Path(os.getenv("WEBAPP_URL_FILE", "data/webapp_url.txt")),
+            bot_username=os.getenv("BOT_USERNAME", "MaisPopularBot").strip().lstrip("@")[:32] or "MaisPopularBot",
         )
+
+    def webapp_url(self) -> str:
+        """Retorna somente uma URL HTTPS pública gravada pelo serviço do túnel."""
+        try:
+            value = self.webapp_url_file.read_text(encoding="utf-8").strip()
+            parts = urlsplit(value)
+        except (OSError, ValueError):
+            return ""
+        if (parts.scheme != "https" or not parts.hostname or parts.username or parts.password
+                or parts.query or parts.fragment):
+            return ""
+        return value.rstrip("/")

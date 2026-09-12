@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1220">
+  <title>Mais Popular</title>
+  <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand-mark" aria-hidden="true">MP</div>
+      <div class="brand-copy"><strong>Mais Popular</strong><span>Serviços digitais</span></div>
+      <button id="balanceButton" class="balance" type="button" aria-label="Ver saldo">
+        <span>Saldo</span><strong id="balanceLabel">—</strong>
+      </button>
+    </header>
+
+    <section id="loading" class="loading-card" aria-live="polite">
+      <div class="loader"></div><strong>Preparando sua loja</strong><span>Carregando catálogo e saldo...</span>
+    </section>
+
+    <section id="authError" class="state-card hidden" aria-live="assertive">
+      <div class="state-icon">!</div><h1>Abra pelo Telegram</h1>
+      <p>Por segurança, o catálogo pessoal funciona pelo botão <b>Abrir loja</b> no bot.</p>
+      <a id="openBotAuth" class="primary-link" href="https://t.me/MaisPopularBot">Abrir o bot</a>
+    </section>
+
+    <div id="app" class="hidden">
+      <section class="hero">
+        <div><span class="eyebrow">CATÁLOGO INTELIGENTE</span>
+          <h1>O que você quer impulsionar?</h1>
+          <p id="welcomeText">Escolha a rede e encontre o serviço certo sem listas gigantes.</p>
+        </div>
+        <div class="hero-orbit" aria-hidden="true"><span></span><span></span><span></span></div>
+      </section>
+
+      <nav class="steps" aria-label="Etapas do pedido">
+        <button class="step active" data-step="platforms" type="button"><i>1</i><span>Rede</span></button>
+        <span></span><button class="step" data-step="families" type="button"><i>2</i><span>Tipo</span></button>
+        <span></span><button class="step" data-step="services" type="button"><i>3</i><span>Serviço</span></button>
+        <span></span><button class="step" data-step="order" type="button"><i>4</i><span>Pedido</span></button>
+      </nav>
+
+      <section id="platforms" class="view">
+        <div class="section-heading"><div><h2>Redes sociais</h2><p id="catalogSummary"></p></div></div>
+        <div id="platformGrid" class="platform-grid"></div>
+      </section>
+
+      <section id="families" class="view hidden">
+        <button class="back" data-back="platforms" type="button">← Todas as redes</button>
+        <div class="section-heading"><div><span class="eyebrow" id="familyPlatform"></span><h2>O que você procura?</h2></div></div>
+        <div id="familyGrid" class="family-grid"></div>
+      </section>
+
+      <section id="services" class="view hidden">
+        <button class="back" data-back="families" type="button">← Outros tipos</button>
+        <div class="section-heading"><div><span class="eyebrow" id="serviceContext"></span><h2>Escolha o serviço</h2></div></div>
+        <label class="search"><span aria-hidden="true">⌕</span><input id="serviceSearch" type="search" placeholder="Buscar nesta lista" autocomplete="off"></label>
+        <div id="serviceList" class="service-list"></div>
+      </section>
+
+      <section id="order" class="view hidden">
+        <button class="back" data-back="services" type="button">← Trocar serviço</button>
+        <article class="selected-service">
+          <div><span id="selectedBadge" class="service-badge"></span><h2 id="selectedName"></h2></div>
+          <p id="selectedDescription"></p>
+          <div class="service-facts"><span id="selectedLimits"></span><span id="selectedRate"></span></div>
+        </article>
+        <form id="orderForm" novalidate>
+          <label class="field"><span>Link ou @usuário</span><input id="target" maxlength="1500" required placeholder="Cole aqui o destino do serviço" autocomplete="off"></label>
+          <label id="valueField" class="field"><span id="valueLabel">Quantidade</span><input id="value" inputmode="numeric" autocomplete="off"><small id="valueHint"></small></label>
+          <label id="answerField" class="field hidden"><span>Alternativa da enquete</span><input id="answer" inputmode="numeric" maxlength="6" placeholder="Ex.: 2"></label>
+          <div class="price-card"><div><span>Valor do pedido</span><small>Calculado automaticamente</small></div><strong id="livePrice">R$ 0,00</strong></div>
+          <p class="safe-note"><span aria-hidden="true">✓</span>Nunca pedimos senha. Confira o link antes de continuar.</p>
+          <button id="reviewButton" class="primary-button" type="submit">Revisar pedido</button>
+        </form>
+      </section>
+
+      <section id="success" class="view hidden">
+        <div class="success-mark">✓</div><span class="eyebrow">PEDIDO RECEBIDO</span>
+        <h1>Tudo certo!</h1><p id="successText"></p>
+        <div class="success-actions"><button id="newOrder" class="primary-button" type="button">Fazer outro pedido</button><button id="closeApp" class="secondary-button" type="button">Fechar loja</button></div>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" class="toast hidden" role="status"></div>
+  <div id="reviewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-card"><div class="modal-handle"></div><span class="eyebrow">CONFIRMAÇÃO</span><h2 id="reviewTitle">Revise seu pedido</h2>
+      <dl><div><dt>Serviço</dt><dd id="reviewService"></dd></div><div><dt>Destino</dt><dd id="reviewTarget"></dd></div><div><dt>Valor final</dt><dd id="reviewPrice"></dd></div><div><dt>Saldo após o pedido</dt><dd id="reviewBalance"></dd></div></dl>
+      <p id="reviewWarning" class="modal-warning hidden"></p>
+      <button id="confirmButton" class="primary-button" type="button">Confirmar e enviar</button>
+      <button class="secondary-button" data-close-modal type="button">Voltar e corrigir</button>
+    </div>
+  </div>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>

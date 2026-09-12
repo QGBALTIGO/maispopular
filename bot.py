@@ -7,7 +7,7 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 
-from telegram import BotCommand, LinkPreviewOptions, Update
+from telegram import BotCommand, LinkPreviewOptions, MenuButtonWebApp, Update, WebAppInfo
 from telegram import InlineKeyboardMarkup as Keyboard
 from telegram.error import TelegramError
 from telegram.ext import (
@@ -42,6 +42,13 @@ from ui_checkout import begin_order, text_input
 from ui_common import LOG, SecretFilter, btn, e, guard, panel, say, uid
 from ui_orders import action_preview, action_result, order_page, order_text, orders_page
 from ui_payments import choose_deposit, deposit_menu, payment_page
+
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if context.args and context.args[0].casefold() == "deposit":
+        await deposit_menu(update, context)
+        return
+    await home(update, context)
 
 
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -267,6 +274,7 @@ async def post_init(app: Application) -> None:
         BotCommand("pedido", "Consultar pedido"), BotCommand("cancelar", "Cancelar preenchimento"),
         BotCommand("ajuda", "Como funciona"),
     ])
+    await sync_webapp_button(app)
     try:
         operational = await p.api.balance()
         if (operational["currency"] == "BRL"
@@ -286,13 +294,31 @@ async def post_shutdown(app: Application) -> None:
     await p.payments.close()
 
 
+async def sync_webapp_button(app: Application) -> None:
+    url = app.bot_data["panel"].settings.webapp_url()
+    if not url or app.bot_data.get("webapp_menu_url") == url:
+        return
+    try:
+        await app.bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="Abrir loja", web_app=WebAppInfo(url=url)))
+    except TelegramError:
+        LOG.warning("Não foi possível sincronizar o botão do Mini App.")
+    else:
+        app.bot_data["webapp_menu_url"] = url
+        LOG.info("Botão do Mini App sincronizado.")
+
+
+async def poll_webapp_button(context: ContextTypes.DEFAULT_TYPE) -> None:
+    await sync_webapp_button(context.application)
+
+
 def build_app(p: Panel) -> Application:
     app = (Application.builder().token(p.settings.bot_token).concurrent_updates(False)
            .post_init(post_init).post_shutdown(post_shutdown).build())
     app.bot_data["panel"] = p
     app.add_handler(TypeHandler(Update, guard), group=-1)
     for command, handler in [
-        ("start", home), ("catalogo", catalog_page), ("buscar", search_command),
+        ("start", start_command), ("catalogo", catalog_page), ("buscar", search_command),
         ("saldo", balance_page), ("recarga", deposit_menu), ("pedidos", orders_page),
         ("pedido", order_command), ("cancelar", home), ("meuid", identity),
         ("ajuda", help_page), ("admin", admin_page), ("resolver", resolve_command),
@@ -306,6 +332,8 @@ def build_app(p: Panel) -> Application:
     app.job_queue.run_repeating(poll_orders, interval=p.settings.poll_seconds, first=15,
                                 job_kwargs={"max_instances": 1, "coalesce": True})
     app.job_queue.run_repeating(poll_payments, interval=p.settings.poll_seconds, first=10,
+                                job_kwargs={"max_instances": 1, "coalesce": True})
+    app.job_queue.run_repeating(poll_webapp_button, interval=15, first=5,
                                 job_kwargs={"max_instances": 1, "coalesce": True})
     return app
 
