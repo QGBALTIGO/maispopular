@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.venv
+venv
+__pycache__
+**/__pycache__
+.git
+data
+*.sqlite3
+*.sqlite3-*
+*.lock
+*.zip
