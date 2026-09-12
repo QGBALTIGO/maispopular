@@ -1,11 +1,12 @@
-"""Cliente SouPopular v2. POST form-urlencoded, TLS ativo e sem repetir escritas."""
+"""Cliente privado do fornecedor de serviços."""
 import asyncio
 import re
 import time
 from typing import Any
 
 import httpx
-from config import API_URL
+
+from config import PROVIDER_API_URL
 from domain import Service, decimal_value
 
 
@@ -17,12 +18,12 @@ class UncertainWrite(ProviderError):
     """A escrita pode ter sido aceita. É proibido reenviar automaticamente."""
 
 
-class SouPopular:
+class ServiceProvider:
     def __init__(self, api_key: str, *, transport: httpx.AsyncBaseTransport | None = None):
         self._key = api_key
         self.client = httpx.AsyncClient(
             timeout=httpx.Timeout(30, connect=8), verify=True, follow_redirects=False,
-            transport=transport, headers={"User-Agent": "TelegramServicePanel/1.0"},
+            transport=transport, headers={"User-Agent": "MaisPopularBot/2.0"},
         )
         self._services: list[Service] = []
         self._expires = 0.0
@@ -43,7 +44,7 @@ class SouPopular:
         tries = 1 if write else 3
         for attempt in range(tries):
             try:
-                response = await self.client.post(API_URL, data=body)
+                response = await self.client.post(PROVIDER_API_URL, data=body)
             except httpx.RequestError:
                 if write:
                     raise UncertainWrite("Conexão interrompida. Confira no painel antes de qualquer novo envio.") from None

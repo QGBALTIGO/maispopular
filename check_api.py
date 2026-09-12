@@ -2,17 +2,19 @@
 import asyncio
 import os
 import sys
+
 from dotenv import load_dotenv
+
 from domain import money
-from provider import ProviderError, SouPopular
+from provider import ProviderError, ServiceProvider
 
 
 async def main() -> None:
     load_dotenv(override=False)
-    key = os.getenv('SOUPOPULAR_API_KEY','').strip()
-    if not key or key == 'COLE_SUA_CHAVE_DA_SOPOPULAR':
-        raise ValueError('Configure SOUPOPULAR_API_KEY no .env.')
-    api = SouPopular(key)
+    key = os.getenv('PROVIDER_API_KEY','').strip()
+    if not key or key.startswith('COLE_'):
+        raise ValueError('Configure PROVIDER_API_KEY no .env.')
+    api = ServiceProvider(key)
     try:
         balance = await api.balance()
         services = await api.services(force=True)

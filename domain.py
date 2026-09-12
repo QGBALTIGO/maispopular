@@ -1,10 +1,10 @@
-"""Validações e cálculo de orçamento, sem chamadas externas."""
-from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation, ROUND_UP
+"""Regras de catálogo, validação e dinheiro, sem chamadas externas."""
 import html
 import ipaddress
 import re
 import unicodedata
+from dataclasses import dataclass, replace
+from decimal import ROUND_UP, Decimal, InvalidOperation
 from urllib.parse import urlsplit
 
 SUPPORTED_TYPES = {"default", "custom comments", "package", "poll"}
@@ -17,6 +17,38 @@ STATUS_PT = {
     "failed": "❌ Falhou", "awaiting": "⏳ Aguardando atualização",
 }
 
+PLATFORMS = (
+    ("Instagram", "📸", ("instagram", "insta ", " ig ", "reels")),
+    ("TikTok", "🎵", ("tiktok", "tik tok")),
+    ("YouTube", "▶️", ("youtube", "youtu.be", "shorts", " yt ")),
+    ("Telegram", "✈️", ("telegram", "canal tg", "grupo tg")),
+    ("Facebook", "📘", ("facebook", "facebook.com", "fb ")),
+    ("Kwai", "🟠", ("kwai",)),
+    ("X / Twitter", "🐦", ("twitter", "tweet", " x.com")),
+    ("Threads", "🧵", ("threads",)),
+    ("WhatsApp", "💬", ("whatsapp", "whats app", "whsp")),
+    ("Spotify", "🎧", ("spotify",)),
+    ("Twitch", "🟣", ("twitch",)),
+    ("Discord", "🎮", ("discord",)),
+    ("LinkedIn", "💼", ("linkedin",)),
+    ("Pinterest", "📌", ("pinterest",)),
+    ("SoundCloud", "☁️", ("soundcloud",)),
+    ("SnackVideo", "⚫", ("snackvideo",)),
+    ("Roblox", "🎲", ("roblox",)),
+    ("Bluesky", "🦋", ("bluesky", "blue sky")),
+    ("Kick", "🟢", (" kick ",)),
+    ("Google", "🔎", ("google",)),
+    ("Streaming e Apps", "🔥", ("servicos streaming", "serviços streaming")),
+    ("Sites e SEO", "🌐", ("website", "site ", "seo", "trafego", "tráfego")),
+)
+
+BLOCKED_CATALOG_WORDS = (
+    "nao comprar", "não comprar", "desativado", "disabled", "servico teste",
+    "serviço teste", "test service", "nao usar", "não usar", "indisponivel",
+    "indisponível", "saldo", "recarga", "painel smm", "api key",
+    "uso interno", "interno",
+)
+
 
 def normalize(text: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFKD", text.casefold())
@@ -26,15 +58,26 @@ def normalize(text: str) -> str:
 def decimal_value(value: object) -> Decimal:
     try:
         number = Decimal(str(value))
-        if not number.is_finite() or number < 0 or number > Decimal("1000000000000"):
+        if not number.is_finite() or number < 0 or number > Decimal(1000000000000):
             raise ValueError
         return number
     except (InvalidOperation, ValueError):
-        raise ValueError("O fornecedor retornou um valor monetário inválido.") from None
+        raise ValueError("Foi recebido um valor monetário inválido.") from None
 
 
-def money(amount: object, currency: str) -> str:
-    # Cinco casas preservam custos pequenos, sem exibir R$ 0,00 indevidamente.
+def retail_price(provider_cost: object, multiplier: Decimal = Decimal(2)) -> Decimal:
+    return (decimal_value(provider_cost) * multiplier).quantize(Decimal("0.01"), rounding=ROUND_UP)
+
+
+def money_brl(amount: object) -> str:
+    number = decimal_value(amount).quantize(Decimal("0.01"), rounding=ROUND_UP)
+    digits = f"{number:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {digits}"
+
+
+def money(amount: object, currency: str = "BRL") -> str:
+    if currency.upper() == "BRL":
+        return money_brl(amount)
     number = decimal_value(amount).quantize(Decimal("0.00001"), rounding=ROUND_UP)
     digits = f"{number:,.5f}".replace(",", "_").replace(".", ",").replace("_", ".")
     return f"{currency} {digits}"
@@ -51,7 +94,18 @@ def capability(value: object) -> bool | None:
 
 
 def plain(text: object, limit: int = 1000) -> str:
-    return html.unescape(re.sub(r"<[^>]*>", "", str(text)))[:limit]
+    value = html.unescape(re.sub(r"<[^>]*>", "", str(text)))
+    value = re.sub(r"https?://\S+|(?:www\.)?soupopular\.net\S*", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"\bSou\s*Popular\b", "nossa plataforma", value, flags=re.IGNORECASE)
+    return re.sub(r"[ \t]+", " ", value).strip()[:limit]
+
+
+def platform_for(name: str, category: str) -> tuple[str, str]:
+    haystack = f" {normalize(category)} {normalize(name)} "
+    for label, emoji, needles in PLATFORMS:
+        if any(normalize(needle) in haystack for needle in needles):
+            return label, emoji
+    return "Outros serviços", "✨"
 
 
 @dataclass(frozen=True)
@@ -66,22 +120,39 @@ class Service:
     description: str
     refill: bool | None
     cancel: bool | None
+    platform: str = "Outros serviços"
+    platform_emoji: str = "✨"
 
     @classmethod
     def parse(cls, data: dict) -> "Service":
         service_id = int(data["service"])
         minimum, maximum = int(data["min"]), int(data["max"])
-        if service_id < 1 or minimum < 0 or maximum < minimum or maximum > 10**12:
-            raise ValueError("Serviço com limites inválidos.")
-        return cls(service_id, plain(data["name"], 220),
-                   plain(data.get("category", "Outros"), 160), str(data["type"]).strip(),
-                   decimal_value(data["rate"]), minimum, maximum,
-                   plain(data.get("description") or "", 1200),
-                   capability(data.get("refill")), capability(data.get("cancel")))
+        rate = decimal_value(data["rate"])
+        if service_id < 1 or minimum < 1 or maximum < minimum or maximum > 10**12 or rate <= 0:
+            raise ValueError("Serviço com valores inválidos.")
+        name = plain(data["name"], 220)
+        category = plain(data.get("category", "Outros"), 160) or "Outros"
+        platform, emoji = platform_for(name, category)
+        description = plain(data.get("description") or "", 1200)
+        if not description:
+            description = f"Serviço de {platform} com os limites e a quantidade informados abaixo."
+        return cls(service_id, name, category, str(data["type"]).strip(), rate,
+                   minimum, maximum, description, capability(data.get("refill")),
+                   capability(data.get("cancel")), platform, emoji)
 
     @property
     def supported(self) -> bool:
         return self.kind.casefold() in SUPPORTED_TYPES
+
+    @property
+    def sellable(self) -> bool:
+        haystack = normalize(f"{self.name} {self.category}")
+        return (self.supported and self.platform != "Outros serviços"
+                and bool(re.search(r"[A-Za-zÀ-ÿ0-9]", self.name))
+                and not any(normalize(x) in haystack for x in BLOCKED_CATALOG_WORDS))
+
+    def with_retail_rate(self, multiplier: Decimal) -> "Service":
+        return replace(self, rate=retail_price(self.rate, multiplier))
 
 
 def validate_target(value: str) -> str:
@@ -107,18 +178,17 @@ def validate_target(value: str) -> str:
                 raise ValueError
     except ValueError:
         raise ValueError("Envie uma URL pública http/https ou um @usuário, conforme o serviço.") from None
-    # O bot não visita o destino: apenas transmite o campo ao fornecedor.
     return value
 
 
 def build_payload(service: Service, target: str, value: str | None = None,
                   answer: str | None = None) -> tuple[dict, Decimal]:
     if not service.supported:
-        raise ValueError("Esse tipo de serviço ainda não tem formulário nesta versão.")
+        raise ValueError("Esse tipo de serviço não está disponível para compra.")
     kind = service.kind.casefold()
     payload = {"service": service.id, "link": validate_target(target)}
     if kind == "package":
-        return payload, service.rate  # Preço do pacote, não dividido por mil.
+        return payload, service.rate
     if kind == "custom comments":
         comments = [line.strip() for line in (value or "").splitlines() if line.strip()]
         if not comments or len("\n".join(comments)) > 3500:
@@ -141,7 +211,6 @@ def build_payload(service: Service, target: str, value: str | None = None,
 
 
 def check_quote(service: Service, payload: dict) -> Decimal:
-    """Recalcula o mesmo formulário usando preços e limites recém-consultados."""
     value = payload.get("comments", str(payload.get("quantity", "")))
     current, cost = build_payload(service, payload["link"], value, str(payload.get("answer_number", "")))
     if current != payload:

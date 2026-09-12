@@ -6,10 +6,10 @@ services:
     environment:
       DATABASE_PATH: /app/data/bot.sqlite3
     volumes:
-      - soupopular-data:/app/data
+      - maispopular-data:/app/data
     stop_grace_period: 45s
     security_opt:
       - no-new-privileges:true
 
 volumes:
-  soupopular-data:
+  maispopular-data:

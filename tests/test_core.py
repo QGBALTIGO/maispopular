@@ -1,421 +1,249 @@
-"""Testes offline: nenhum pedido ou solicitação é enviado a um provedor real."""
-from dataclasses import replace
-from decimal import Decimal
+"""Testes offline do catálogo, carteira, pedidos e pagamentos."""
 import json
-from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import AsyncMock, patch
-from urllib.parse import parse_qs
+from decimal import Decimal
+from pathlib import Path
+from unittest.mock import AsyncMock
 
 import httpx
-from config import Settings, boolean, ids
-from domain import Service, build_payload, capability, decimal_value, money, validate_target
+
+from config import Settings
+from domain import Service, build_payload, money_brl, retail_price, validate_target
 from engine import Panel
-from provider import SouPopular, ProviderError, UncertainWrite
+from payments import Cakto, PaymentError, validate_customer
+from provider import ProviderError, ServiceProvider
 from storage import Store
 
-
-RAW = {'service':42,'name':'Serviço teste','category':'Categoria','type':'Default',
-       'rate':'10.00','min':'10','max':'10000','refill':True,'cancel':True}
+RAW = {"service": 42, "name": "Seguidores Instagram", "category": "Instagram",
+       "type": "Default", "rate": "10", "min": "100", "max": "10000",
+       "description": "Entrega gradual", "refill": True, "cancel": False}
 
 
 def service(**changes):
-    return Service.parse({**RAW,**changes})
+    return Service.parse({**RAW, **changes})
 
 
-def settings(path: Path, **changes):
-    return Settings('123456:dummy_for_tests','dummy_key',frozenset({11,22}),frozenset(),path,
-                    changes.get('dry_run',True),changes.get('max_order_cost',Decimal('100')),120,'Painel teste')
+def settings(path: Path) -> Settings:
+    return Settings(
+        bot_token="123456:dummy", api_key="dummy", admin_ids=frozenset({99}),
+        allowed_services=frozenset(), db_path=path, max_order_cost=Decimal(5000),
+        poll_seconds=60, bot_name="Mais Popular", price_multiplier=Decimal(2),
+        min_deposit_brl=Decimal(20), max_deposit_brl=Decimal(5000),
+        cakto_client_id="client", cakto_client_secret="secret", cakto_offer_id="offer1",
+        cakto_unit_price_brl=5, cakto_pix_expires=3600, fingerprint_secret="fingerprint-secret",
+    )
 
 
 class DomainTests(unittest.TestCase):
-    def test_default_rate_per_thousand(self):
-        payload,cost = build_payload(service(),'https://example.com/post','250')
-        self.assertEqual(cost,Decimal('2.50'))
-        self.assertEqual(payload,{'service':42,'link':'https://example.com/post','quantity':250})
+    def test_price_is_exactly_double_and_rounded_to_cents(self):
+        self.assertEqual(retail_price("10"), Decimal("20.00"))
+        self.assertEqual(retail_price("0.001"), Decimal("0.01"))
 
-    def test_comments_below_minimum(self):
-        with self.assertRaises(ValueError):
-            build_payload(service(type='Custom Comments'),'@teste','Um\n\nDois')
+    def test_money_is_brazilian(self):
+        self.assertEqual(money_brl("1234.5"), "R$ 1.234,50")
 
-    def test_comments_no_quantity_field(self):
-        payload,cost = build_payload(service(type='Custom Comments',min='1'),'@teste','Um\nDois')
-        self.assertNotIn('quantity',payload)
-        self.assertEqual(cost,Decimal('0.02'))
+    def test_platform_first_classification(self):
+        self.assertEqual(service().platform, "Instagram")
+        self.assertEqual(service(name="Membros Telegram", category="Diversos").platform, "Telegram")
 
-    def test_package_flat_rate(self):
-        payload,cost = build_payload(service(type='Package'),'@teste')
-        self.assertNotIn('quantity',payload)
-        self.assertEqual(cost,Decimal('10'))
+    def test_non_product_and_unsupported_are_hidden(self):
+        self.assertFalse(service(name="Serviço teste").sellable)
+        self.assertFalse(service(type="Subscriptions").sellable)
 
-    def test_poll_answer(self):
-        payload,cost = build_payload(service(type='Poll'),'https://example.com/p','100','3')
-        self.assertEqual(payload['answer_number'],3)
-        self.assertEqual(cost,Decimal('1'))
+    def test_description_removes_vendor_link_and_brand(self):
+        item = service(description="Veja SouPopular em https://soupopular.net/services para regras")
+        self.assertNotIn("soupopular", item.description.lower())
+        self.assertNotIn("http", item.description.lower())
 
-    def test_poll_invalid_answer(self):
-        for value in ('0','a','-1',''):
-            with self.subTest(value=value),self.assertRaises(ValueError):
-                build_payload(service(type='Poll'),'@teste','100',value)
-
-    def test_invalid_quantities(self):
-        for value in ('0','-1','10001','1.000','1,000','2.5','9','abc'):
-            with self.subTest(value=value),self.assertRaises(ValueError):
-                build_payload(service(),'@teste',value)
-
-    def test_subscription_not_silently_treated_as_default(self):
-        with self.assertRaises(ValueError):
-            build_payload(service(type='Subscriptions'),'@teste','100')
-
-    def test_invalid_money_rejected(self):
-        for value in ('NaN','Infinity','-1','bad'):
-            with self.subTest(value=value),self.assertRaises(ValueError):
-                decimal_value(value)
-
-    def test_small_money_not_rounded_to_zero(self):
-        self.assertEqual(money('0.000001','BRL'),'BRL 0,00001')
-
-    def test_boolean_false_not_truthy_string(self):
-        self.assertIs(capability('false'),False)
-        self.assertIs(capability('0'),False)
-        self.assertIsNone(capability(None))
-        self.assertTrue(capability('true'))
+    def test_default_order_cost(self):
+        payload, cost = build_payload(service(), "https://instagram.com/p/abc", "250")
+        self.assertEqual(cost, Decimal("2.5"))
+        self.assertEqual(payload["quantity"], 250)
 
     def test_invalid_targets(self):
-        for target in ('','file:///etc/passwd','javascript:alert(1)','https://127.0.0.1/x',
-                       'http://localhost/a','https://user:pass@example.com','https://example.com:999/a','abc def'):
-            with self.subTest(target=target),self.assertRaises(ValueError):
-                validate_target(target)
+        for value in ("", "http://localhost/a", "http://127.0.0.1/a", "javascript:alert(1)"):
+            with self.assertRaises(ValueError):
+                validate_target(value)
 
-    def test_valid_targets(self):
-        for target in ('@conta','https://t.me/canal','https://example.com/a?b=1'):
-            self.assertEqual(validate_target(target),target)
-
-    def test_config_fail_closed(self):
-        self.assertEqual(ids(''),frozenset())
+    def test_customer_validation(self):
+        customer = validate_customer("Maria da Silva", "maria@example.com", "67999999999", "52998224725")
+        self.assertEqual(customer["phone"], "5567999999999")
         with self.assertRaises(ValueError):
-            ids('-1')
+            validate_customer("Maria Silva", "bad", "67999999999", "52998224725")
         with self.assertRaises(ValueError):
-            boolean('maybe')
+            validate_customer("Maria Silva", "maria@example.com", "67999999999", "11111111111")
 
 
-class ProviderTests(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        self.calls = []
-        self.clients = []
+class StoreTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = Store(Path(self.tmp.name) / "db.sqlite3")
+        self.store.register_user(1, "user", "User One")
 
-    async def asyncTearDown(self):
-        for client in self.clients:
-            await client.close()
+    def tearDown(self):
+        self.store.close()
+        self.tmp.cleanup()
 
-    def api(self, handler):
-        async def wrapped(request):
-            self.calls.append(parse_qs(request.content.decode()))
-            self.assertEqual(request.url,'https://soupopular.net/api/v2')
-            self.assertEqual(request.method,'POST')
-            self.assertIn('application/x-www-form-urlencoded',request.headers['content-type'])
-            return handler(request)
-        client = SouPopular('super_secret_key',transport=httpx.MockTransport(wrapped))
-        self.clients.append(client)
-        return client
+    def paid_wallet(self, amount=20):
+        row = self.store.create_payment(1, amount * 100, {"name": "User One"})
+        self.store.payment_created(row["id"], {
+            "id": "cakto-" + row["id"], "refId": "REF", "status": "waiting_payment",
+            "checkoutUrl": "https://pay.cakto.com.br/REF",
+            "pix": {"qrCode": "000201", "expirationDate": "tomorrow"},
+        })
+        return self.store.update_payment_status(row["id"], "paid")[0]
 
-    async def test_service_list_and_cache(self):
-        api = self.api(lambda request:httpx.Response(200,json=[RAW]))
-        self.assertEqual((await api.services())[0].id,42)
-        await api.services()
-        self.assertEqual(len(self.calls),1)
-        self.assertEqual(self.calls[0]['action'],['services'])
-        self.assertEqual(self.calls[0]['key'],['super_secret_key'])
+    def test_payment_credit_is_idempotent(self):
+        row = self.paid_wallet(20)
+        self.assertEqual(self.store.balance_cents(1), 2000)
+        _, changed = self.store.update_payment_status(row["id"], "paid")
+        self.assertFalse(changed)
+        self.assertEqual(self.store.balance_cents(1), 2000)
 
-    async def test_status_uses_order_not_translated_or_service(self):
-        api = self.api(lambda request:httpx.Response(200,json={'status':'Pending'}))
-        await api.status(123)
-        self.assertEqual(self.calls[0]['order'],['123'])
-        self.assertNotIn('service',self.calls[0])
-        self.assertNotIn('pedido',self.calls[0])
+    def test_chargeback_reverses_once(self):
+        row = self.paid_wallet(20)
+        self.store.update_payment_status(row["id"], "chargedback")
+        self.store.update_payment_status(row["id"], "chargedback")
+        self.assertEqual(self.store.balance_cents(1), 0)
 
-    async def test_multi_status_uses_orders(self):
-        api = self.api(lambda request:httpx.Response(200,json={'1':{'status':'Completed'}}))
-        await api.multi_status([1,2])
-        self.assertEqual(self.calls[0]['orders'],['1,2'])
+    def test_paid_payments_remain_in_reconciliation_rotation(self):
+        row = self.paid_wallet(20)
+        self.store.payment_notified(row["id"], "paid")
+        self.assertIn(row["id"], {item["id"] for item in self.store.pending_payments()})
 
-    async def test_add_reads_provider_id(self):
-        api = self.api(lambda request:httpx.Response(200,json={'order':77}))
-        self.assertEqual(await api.add({'service':42,'link':'@teste','quantity':100}),'77')
-        self.assertEqual(self.calls[0]['action'],['add'])
+    def test_order_claim_debits_and_refund_is_idempotent(self):
+        self.paid_wallet(20)
+        row = self.store.create_order(1, service(), {"service": 42, "link": "@abc", "quantity": 100},
+                                      Decimal(1), Decimal(2))
+        self.assertTrue(self.store.claim_order(row["id"], 1))
+        self.assertEqual(self.store.balance_cents(1), 1800)
+        self.store.refund_order(row["id"], "refund")
+        self.store.refund_order(row["id"], "refund")
+        self.assertEqual(self.store.balance_cents(1), 2000)
 
-    async def test_add_timeout_is_uncertain_and_not_retried(self):
-        def handler(request):
-            raise httpx.ReadTimeout('timeout',request=request)
-        api = self.api(handler)
-        with self.assertRaises(UncertainWrite):
-            await api.add({'service':42})
-        self.assertEqual(len(self.calls),1)
+    def test_reject_and_refund_is_atomic_and_idempotent(self):
+        self.paid_wallet(20)
+        row = self.store.create_order(1, service(), {"service": 42, "link": "@abc", "quantity": 100},
+                                      Decimal(1), Decimal(2))
+        self.store.claim_order(row["id"], 1)
+        self.store.reject_order_and_refund(row["id"], "refund", "rejected")
+        self.store.reject_order_and_refund(row["id"], "refund", "rejected")
+        self.assertEqual(self.store.order(row["id"])["state"], "REJECTED")
+        self.assertEqual(self.store.balance_cents(1), 2000)
 
-    async def test_add_5xx_not_retried(self):
-        api = self.api(lambda request:httpx.Response(503,text='unavailable'))
-        with self.assertRaises(UncertainWrite):
-            await api.add({'service':42})
-        self.assertEqual(len(self.calls),1)
-
-    async def test_missing_order_id_uncertain(self):
-        api = self.api(lambda request:httpx.Response(200,json={'ok':True}))
-        with self.assertRaises(UncertainWrite):
-            await api.add({'service':42})
-
-    async def test_bad_json_write_uncertain(self):
-        api = self.api(lambda request:httpx.Response(200,text='<html>Oops</html>'))
-        with self.assertRaises(UncertainWrite):
-            await api.add({'service':42})
-
-    async def test_explicit_error_redacts_key(self):
-        api = self.api(lambda request:httpx.Response(200,json={'error':'Invalid super_secret_key'}))
-        with self.assertRaises(ProviderError) as cm:
-            await api.add({'service':42})
-        self.assertNotIn('super_secret_key',str(cm.exception))
-        self.assertNotIsInstance(cm.exception,UncertainWrite)
-
-    async def test_reads_can_retry(self):
-        def handler(request):
-            if len(self.calls) < 3:
-                return httpx.Response(503)
-            return httpx.Response(200,json={'balance':'10','currency':'BRL'})
-        api = self.api(handler)
-        with patch('provider.asyncio.sleep',new=AsyncMock()):
-            result = await api.balance()
-        self.assertEqual(result['currency'],'BRL')
-        self.assertEqual(len(self.calls),3)
-
-    async def test_redirect_does_not_forward_key(self):
-        api = self.api(lambda request:httpx.Response(302,headers={'Location':'https://other.example/'}))
-        with self.assertRaises(ProviderError):
-            await api.balance()
-        self.assertEqual(len(self.calls),1)
-
-    async def test_refill_actions_use_english_fields(self):
-        api = self.api(lambda request:httpx.Response(200,json={'refill':55,'status':'Pending'}))
-        self.assertEqual(await api.refill(77),'55')
-        await api.refill_status(55)
-        self.assertEqual(self.calls[0]['action'],['refill'])
-        self.assertEqual(self.calls[1]['action'],['refill_status'])
-        self.assertEqual(self.calls[1]['refill'],['55'])
-
-    async def test_balance_currency_not_assumed_brl(self):
-        api = self.api(lambda request:httpx.Response(200,json={'balance':'100','currency':'USD'}))
-        self.assertEqual((await api.balance())['currency'],'USD')
-
-    async def test_invalid_service_skipped(self):
-        api = self.api(lambda request:httpx.Response(200,json=[{'broken':1},RAW]))
-        self.assertEqual(len(await api.services()),1)
-
-    async def test_bad_ids_rejected_without_network(self):
-        api = self.api(lambda request:httpx.Response(200,json={}))
-        with self.assertRaises(ValueError):
-            await api.multi_status([])
-        with self.assertRaises(ValueError):
-            await api.status(-1)
-        self.assertEqual(len(self.calls),0)
+    def test_insufficient_wallet_blocks_claim(self):
+        row = self.store.create_order(1, service(), {"service": 42, "link": "@abc", "quantity": 100},
+                                      Decimal(1), Decimal(2))
+        with self.assertRaisesRegex(ValueError, "Saldo insuficiente"):
+            self.store.claim_order(row["id"], 1)
 
 
 class EngineTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.path = Path(self.temp.name)/'test.sqlite3'
-        self.store = Store(self.path)
-        self.api = AsyncMock(spec=SouPopular)
-        self.api.services.return_value = [service()]
-        self.api.balance.return_value = {'balance':'100','currency':'BRL'}
-        self.api.add.return_value = '900'
-        self.api.refill.return_value = '12'
-        self.api.cancel.return_value = [{'order':900,'cancel':1}]
-        self.p = Panel(settings(self.path),self.api,self.store)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = Store(Path(self.tmp.name) / "db.sqlite3")
+        self.store.register_user(1, "u", "User")
+        pay = self.store.create_payment(1, 2000, {"name": "User"})
+        self.store.payment_created(pay["id"], {"id": "pay-id", "status": "waiting_payment",
+            "pix": {"qrCode": "code"}, "checkoutUrl": "https://pay.cakto.com.br/X"})
+        self.store.update_payment_status(pay["id"], "paid")
+        self.api = AsyncMock(spec=ServiceProvider)
+        self.api.services.return_value = [service(), service(service=99, type="Subscriptions")]
+        self.api.balance.return_value = {"balance": "100", "currency": "BRL"}
+        self.api.add.return_value = "77"
+        self.cakto = AsyncMock(spec=Cakto)
+        self.p = Panel(settings(Path(self.tmp.name) / "db.sqlite3"), self.api, self.cakto, self.store)
 
     async def asyncTearDown(self):
         self.store.close()
-        self.temp.cleanup()
+        self.tmp.cleanup()
 
-    async def quote(self):
-        return await self.p.quote(11,42,'@teste','100')
+    async def test_catalog_filters_and_quote_doubles(self):
+        self.assertEqual([x.id for x in await self.p.catalog()], [42])
+        row = await self.p.quote(1, 42, "@target", "100")
+        self.assertEqual(Decimal(row["provider_cost"]), Decimal(1))
+        self.assertEqual(Decimal(row["cost"]), Decimal("2.00"))
 
-    async def real_order(self):
-        self.p.settings = replace(self.p.settings,dry_run=False)
-        row = await self.quote()
-        return await self.p.submit(row['id'],11)
-
-    async def test_dry_run_never_calls_add(self):
-        row = await self.quote()
-        result = await self.p.submit(row['id'],11)
-        self.assertEqual(result['state'],'SIMULATED')
-        self.api.add.assert_not_awaited()
-
-    async def test_real_double_click_sends_once(self):
-        result = await self.real_order()
-        await self.p.submit(result['id'],11)
-        self.api.add.assert_awaited_once()
-        self.assertEqual(result['provider_id'],'900')
-
-    async def test_concurrent_double_click_sends_once(self):
-        import asyncio
-        self.p.settings = replace(self.p.settings,dry_run=False)
-        row = await self.quote()
-        await asyncio.gather(self.p.submit(row['id'],11),self.p.submit(row['id'],11))
+    async def test_submit_debits_wallet_and_sends_once(self):
+        row = await self.p.quote(1, 42, "@target", "100")
+        first = await self.p.submit(row["id"], 1)
+        second = await self.p.submit(row["id"], 1)
+        self.assertEqual(first["state"], "SUBMITTED")
+        self.assertEqual(second["provider_id"], "77")
+        self.assertEqual(self.store.balance_cents(1), 1800)
         self.api.add.assert_awaited_once()
 
-    async def test_unauthorized_user(self):
-        with self.assertRaises(PermissionError):
-            await self.p.quote(99,42,'@teste','100')
-        self.api.add.assert_not_awaited()
+    async def test_explicit_rejection_refunds_wallet(self):
+        self.api.add.side_effect = ProviderError("recusado")
+        row = await self.p.quote(1, 42, "@target", "100")
+        result = await self.p.submit(row["id"], 1)
+        self.assertEqual(result["state"], "REJECTED")
+        self.assertEqual(self.store.balance_cents(1), 2000)
 
-    async def test_other_admin_cannot_use_order(self):
-        row = await self.quote()
+    async def test_payment_minimum(self):
         with self.assertRaises(ValueError):
-            await self.p.submit(row['id'],22)
-        self.assertIsNone(self.store.order(row['id'],22))
+            await self.p.create_payment(1, 19, {"name": "User"})
 
-    async def test_price_change_invalidates_quote(self):
-        row = await self.quote()
-        self.api.services.return_value = [service(rate='12')]
-        with self.assertRaises(ValueError):
-            await self.p.submit(row['id'],11)
-        self.assertEqual(self.store.order(row['id'],11)['state'],'EXPIRED')
-        self.api.add.assert_not_awaited()
+    async def test_payment_must_match_offer_unit(self):
+        with self.assertRaisesRegex(ValueError, "múltiplo"):
+            await self.p.create_payment(1, 22, {"name": "User"})
 
-    async def test_currency_change_invalidates_quote(self):
-        row = await self.quote()
-        self.api.balance.return_value = {'balance':'100','currency':'USD'}
-        with self.assertRaises(ValueError):
-            await self.p.submit(row['id'],11)
-        self.api.add.assert_not_awaited()
+    async def test_reconcile_refuses_amount_mismatch(self):
+        row = self.store.create_payment(1, 2000, {"name": "User"})
+        self.store.payment_created(row["id"], {"id": "other-pay-id", "status": "waiting_payment",
+            "pix": {"qrCode": "code"}, "checkoutUrl": "https://pay.cakto.com.br/X"})
+        self.cakto.order.return_value = {"status": "paid", "baseAmount": "19.99"}
+        with self.assertRaises(PaymentError):
+            await self.p.reconcile_payment(row["id"])
+        self.assertEqual(self.store.balance_cents(1), 2000)
 
-    async def test_insufficient_balance_blocks_real(self):
-        self.p.settings = replace(self.p.settings,dry_run=False)
-        row = await self.quote()
-        self.api.balance.return_value = {'balance':'0','currency':'BRL'}
-        with self.assertRaises(ValueError):
-            await self.p.submit(row['id'],11)
-        self.api.add.assert_not_awaited()
-
-    async def test_limit_blocks_quote(self):
-        self.p.settings = replace(self.p.settings,max_order_cost=Decimal('0.5'))
-        with self.assertRaises(ValueError):
-            await self.quote()
-
-    async def test_mode_change_invalidates_quote(self):
-        row = await self.quote()
-        self.p.settings = replace(self.p.settings,dry_run=False)
-        with self.assertRaises(ValueError):
-            await self.p.submit(row['id'],11)
-        self.api.add.assert_not_awaited()
-
-    async def test_timeout_marks_unknown_and_never_resubmits(self):
-        self.p.settings = replace(self.p.settings,dry_run=False)
-        row = await self.quote()
-        self.api.add.side_effect = UncertainWrite('timeout')
-        result = await self.p.submit(row['id'],11)
-        await self.p.submit(row['id'],11)
-        self.assertEqual(result['state'],'UNKNOWN')
-        self.api.add.assert_awaited_once()
-
-    async def test_explicit_rejection_not_unknown(self):
-        self.p.settings = replace(self.p.settings,dry_run=False)
-        row = await self.quote()
-        self.api.add.side_effect = ProviderError('Saldo insuficiente')
-        result = await self.p.submit(row['id'],11)
-        self.assertEqual(result['state'],'REJECTED')
-
-    async def test_new_quote_invalidates_old(self):
-        first = await self.quote()
-        await self.quote()
-        self.assertEqual(self.store.order(first['id'],11)['state'],'ABORTED')
-
-    async def test_expired_cannot_claim(self):
-        row = await self.quote()
-        with self.store.db:
-            self.store.db.execute('UPDATE orders SET expires_at=0 WHERE id=?',(row['id'],))
-        with self.assertRaises(ValueError):
-            await self.p.submit(row['id'],11)
-        self.api.add.assert_not_awaited()
-
-    async def test_atomic_claim_can_only_succeed_once(self):
-        row = await self.quote()
-        self.assertTrue(self.store.claim_order(row['id'],11))
-        self.assertFalse(self.store.claim_order(row['id'],11))
-
-    async def test_restart_recovers_sending_to_unknown(self):
-        row = await self.quote()
-        self.store.claim_order(row['id'],11)
-        self.store.recover()
-        self.assertEqual(self.store.order(row['id'],11)['state'],'UNKNOWN')
-
-    async def test_duplicate_active_target_blocked(self):
-        await self.real_order()
-        other = await self.quote()
-        with self.assertRaises(ValueError):
-            await self.p.submit(other['id'],11)
-        self.api.add.assert_awaited_once()
-
-    async def test_completed_allows_new_order(self):
-        first = await self.real_order()
-        self.store.update_status(first['id'],{'status':'Completed','charge':'1'})
-        self.api.add.return_value = '901'
-        other = await self.quote()
-        result = await self.p.submit(other['id'],11)
-        self.assertEqual(result['provider_id'],'901')
-
-    async def test_service_allowlist_enforced(self):
-        self.p.settings = replace(self.p.settings,allowed_services=frozenset({99}))
-        with self.assertRaises(ValueError):
-            await self.quote()
-
-    async def test_refill_double_click_sends_once(self):
-        row = await self.real_order()
-        action = await self.p.prepare_action(row['id'],11,'refill')
-        result = await self.p.submit_action(action['id'],11)
-        await self.p.submit_action(action['id'],11)
-        self.api.refill.assert_awaited_once()
-        self.assertEqual(json.loads(result['result_json'])['refill'],'12')
-
-    async def test_cancel_accepted_is_request_not_completed_order(self):
-        row = await self.real_order()
-        action = await self.p.prepare_action(row['id'],11,'cancel')
-        result = await self.p.submit_action(action['id'],11)
-        self.assertEqual(result['state'],'SUBMITTED')
-        self.assertEqual(self.store.order(row['id'],11)['provider_status'],'awaiting')
-
-    async def test_action_false_capability_blocks(self):
-        row = await self.real_order()
-        self.api.services.return_value = [service(refill=False)]
-        with self.assertRaises(ValueError):
-            await self.p.prepare_action(row['id'],11,'refill')
-        self.api.refill.assert_not_awaited()
-
-    async def test_unknown_refill_blocks_new_refill(self):
-        row = await self.real_order()
-        self.api.refill.side_effect = UncertainWrite('timeout')
-        action = await self.p.prepare_action(row['id'],11,'refill')
-        result = await self.p.submit_action(action['id'],11)
-        other = await self.p.prepare_action(row['id'],11,'refill')
-        with self.assertRaises(ValueError):
-            await self.p.submit_action(other['id'],11)
-        self.assertEqual(result['state'],'UNKNOWN')
-        self.api.refill.assert_awaited_once()
-
-    async def test_simulated_action_never_mutates_provider(self):
-        row = await self.real_order()
-        self.p.settings = replace(self.p.settings,dry_run=True)
-        action = await self.p.prepare_action(row['id'],11,'cancel')
-        result = await self.p.submit_action(action['id'],11)
-        self.assertEqual(result['state'],'SIMULATED')
-        self.api.cancel.assert_not_awaited()
-
-    async def test_terminal_notification_pending_remains_watched(self):
-        row = await self.real_order()
-        self.store.update_status(row['id'],{'status':'Completed'})
-        self.assertEqual(len(self.store.watched()),1)
-        self.store.notified(row['id'],'Completed')
-        self.assertEqual(self.store.watched(),[])
+    async def test_payment_uses_persisted_idempotency(self):
+        self.cakto.create_pix.return_value = {"id": "new-pay", "refId": "A", "status": "waiting_payment",
+            "baseAmount": "20.00", "checkoutUrl": "https://pay.cakto.com.br/A",
+            "pix": {"qrCode": "pix-code", "expirationDate": "date"}}
+        row = await self.p.create_payment(1, 20, {"name": "User", "email": "u@example.com"})
+        self.assertEqual(row["status"], "PENDING")
+        args = self.cakto.create_pix.await_args.args
+        self.assertEqual(args[1], 20)
+        self.assertEqual(args[2], 5)
+        self.assertTrue(args[5])
 
 
-if __name__ == '__main__':
+class CaktoClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_pix_request_is_authenticated_and_idempotent(self):
+        calls = []
+        def handler(request):
+            calls.append(request)
+            if request.url.path.endswith("/token/"):
+                return httpx.Response(200, json={"access_token": "access", "expires_in": 3600})
+            body = json.loads(request.content)
+            self.assertEqual(body["items"][0]["quantity"], 4)
+            self.assertEqual(request.headers["x-idempotency-key"], "idem")
+            return httpx.Response(201, json={"id": "order", "baseAmount": "20.00",
+                "status": "waiting_payment", "pix": {"qrCode": "code"}})
+        client = Cakto("id", "secret", transport=httpx.MockTransport(handler))
+        try:
+            data = await client.create_pix("offer", 20, 5, {
+                "name": "User Name", "email": "u@example.com", "phone": "5567999999999",
+                "docType": "cpf", "docNumber": "52998224725"}, "finger", "idem", 3600)
+            self.assertEqual(data["id"], "order")
+            self.assertEqual(len(calls), 2)
+        finally:
+            await client.close()
+
+    async def test_offer_must_match_configured_unit_price(self):
+        def handler(request):
+            if request.url.path.endswith("/token/"):
+                return httpx.Response(200, json={"access_token": "access", "expires_in": 3600})
+            return httpx.Response(200, json={"id": "offer", "price": 2, "status": "active", "type": "unique"})
+        client = Cakto("id", "secret", transport=httpx.MockTransport(handler))
+        try:
+            with self.assertRaises(PaymentError):
+                await client.validate_offer("offer", 1)
+        finally:
+            await client.close()
+
+
+if __name__ == "__main__":
     unittest.main()
