@@ -81,6 +81,7 @@ sudo systemctl daemon-reload
 sudo chmod 755 deploy/run_quick_tunnel.sh
 sudo systemctl enable --now maispopular maispopular-webapp maispopular-tunnel
 sudo systemctl status maispopular
+sudo -u maispopular .venv/bin/python check_webapp.py
 ```
 
 O Quick Tunnel gera um endereço HTTPS aleatório. O serviço grava a URL em
