@@ -6,7 +6,7 @@ const initData=tg?.initData||"";
 const money=(value)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(value)||0);
 const escapeText=(value)=>String(value??"");
 
-if(tg){tg.ready();tg.expand();tg.setHeaderColor("#0b1220");tg.setBackgroundColor("#08101d");}
+if(tg){tg.ready();tg.expand();if(initData&&tg.isVersionAtLeast?.("6.1")){tg.setHeaderColor("#0b1220");tg.setBackgroundColor("#08101d");}}
 
 async function api(path,options={}){
   const response=await fetch(path,{...options,headers:{"Content-Type":"application/json","X-Telegram-Init-Data":initData,...options.headers}});

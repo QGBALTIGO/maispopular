@@ -1,0 +1,4 @@
+/* Paleta neutra: sem o antigo destaque rosado no catálogo. */
+.platform-card:nth-child(3n+2) .network-dot {
+  background: linear-gradient(145deg, #6b57ed, #f59e42);
+}
