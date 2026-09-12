@@ -9,7 +9,14 @@ from unittest.mock import AsyncMock
 import httpx
 
 from config import Settings
-from domain import Service, build_payload, money_brl, retail_price, validate_target
+from domain import (
+    Service,
+    build_payload,
+    money_brl,
+    platform_sort_key,
+    retail_price,
+    validate_target,
+)
 from engine import Panel
 from payments import Cakto, PaymentError, validate_customer
 from provider import ProviderError, ServiceProvider
@@ -29,9 +36,10 @@ def settings(path: Path) -> Settings:
         bot_token="123456:dummy", api_key="dummy", admin_ids=frozenset({99}),
         allowed_services=frozenset(), db_path=path, max_order_cost=Decimal(5000),
         poll_seconds=60, bot_name="Mais Popular", price_multiplier=Decimal(2),
-        min_deposit_brl=Decimal(20), max_deposit_brl=Decimal(5000),
-        cakto_client_id="client", cakto_client_secret="secret", cakto_offer_id="offer1",
-        cakto_unit_price_brl=5, cakto_pix_expires=3600, fingerprint_secret="fingerprint-secret",
+        min_deposit_brl=Decimal(20), max_deposit_brl=Decimal(200),
+        cakto_client_id="client", cakto_client_secret="secret",
+        cakto_offers={20: "offer20", 50: "offer50", 100: "offer100", 200: "offer200"},
+        cakto_pix_expires=3600, fingerprint_secret="fingerprint-secret",
     )
 
 
@@ -46,6 +54,12 @@ class DomainTests(unittest.TestCase):
     def test_platform_first_classification(self):
         self.assertEqual(service().platform, "Instagram")
         self.assertEqual(service(name="Membros Telegram", category="Diversos").platform, "Telegram")
+
+    def test_catalog_popularity_and_service_family(self):
+        ordered = sorted(["Telegram", "YouTube", "Instagram", "Facebook"], key=platform_sort_key)
+        self.assertEqual(ordered, ["Instagram", "YouTube", "Facebook", "Telegram"])
+        self.assertEqual(service(name="Instagram Curtidas Brasileiras").family, "Curtidas e reações")
+        self.assertEqual(service(name="Instagram Visualizações Reels").family, "Visualizações")
 
     def test_non_product_and_unsupported_are_hidden(self):
         self.assertFalse(service(name="Serviço teste").sellable)
@@ -185,8 +199,8 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.p.create_payment(1, 19, {"name": "User"})
 
-    async def test_payment_must_match_offer_unit(self):
-        with self.assertRaisesRegex(ValueError, "múltiplo"):
+    async def test_payment_must_match_available_offer(self):
+        with self.assertRaisesRegex(ValueError, "opções"):
             await self.p.create_payment(1, 22, {"name": "User"})
 
     async def test_reconcile_refuses_amount_mismatch(self):
@@ -206,8 +220,8 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(row["status"], "PENDING")
         args = self.cakto.create_pix.await_args.args
         self.assertEqual(args[1], 20)
-        self.assertEqual(args[2], 5)
-        self.assertTrue(args[5])
+        self.assertEqual(args[0], "offer20")
+        self.assertTrue(args[4])
 
 
 class CaktoClientTests(unittest.IsolatedAsyncioTestCase):
@@ -218,13 +232,14 @@ class CaktoClientTests(unittest.IsolatedAsyncioTestCase):
             if request.url.path.endswith("/token/"):
                 return httpx.Response(200, json={"access_token": "access", "expires_in": 3600})
             body = json.loads(request.content)
-            self.assertEqual(body["items"][0]["quantity"], 4)
+            self.assertNotIn("quantity", body["items"][0])
+            self.assertEqual(body["items"][0]["offerId"], "offer")
             self.assertEqual(request.headers["x-idempotency-key"], "idem")
             return httpx.Response(201, json={"id": "order", "baseAmount": "20.00",
                 "status": "waiting_payment", "pix": {"qrCode": "code"}})
         client = Cakto("id", "secret", transport=httpx.MockTransport(handler))
         try:
-            data = await client.create_pix("offer", 20, 5, {
+            data = await client.create_pix("offer", 20, {
                 "name": "User Name", "email": "u@example.com", "phone": "5567999999999",
                 "docType": "cpf", "docNumber": "52998224725"}, "finger", "idem", 3600)
             self.assertEqual(data["id"], "order")

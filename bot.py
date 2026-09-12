@@ -29,6 +29,7 @@ from storage import Store
 from ui_catalog import (
     balance_page,
     catalog_page,
+    family_page,
     help_page,
     home,
     identity,
@@ -62,6 +63,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await catalog_page(update, context, int(parts[1]))
     elif action == "platform":
         await platform_page(update, context, parts[1], int(parts[2]))
+    elif action == "family":
+        await family_page(update, context, parts[1], parts[2], int(parts[3]))
     elif action == "search_prompt":
         await search_prompt(update, context)
     elif action == "search":
@@ -95,8 +98,6 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                   [[btn("🔄 Atualizar", raw), btn("📦 Pedido", f"order:{item['order_id']}")]])
     elif action == "deposit":
         await deposit_menu(update, context)
-    elif action == "deposit_custom":
-        await choose_deposit(update, context)
     elif action == "deposit_amount":
         await choose_deposit(update, context, int(parts[1]))
     elif action == "payment_refresh":
@@ -257,7 +258,8 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def post_init(app: Application) -> None:
     p = app.bot_data["panel"]
-    await p.payments.validate_offer(p.settings.cakto_offer_id, p.settings.cakto_unit_price_brl)
+    await asyncio.gather(*(p.payments.validate_offer(offer_id, amount)
+                           for amount, offer_id in p.settings.cakto_offers.items()))
     await app.bot.set_my_commands([
         BotCommand("start", "Abrir a loja"), BotCommand("catalogo", "Ver redes e serviços"),
         BotCommand("buscar", "Buscar serviço"), BotCommand("saldo", "Minha carteira"),

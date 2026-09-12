@@ -92,8 +92,8 @@ class Panel:
         minimum, maximum = int(self.settings.min_deposit_brl), int(self.settings.max_deposit_brl)
         if not minimum <= amount_reais <= maximum:
             raise ValueError(f"Escolha um valor inteiro entre R$ {minimum} e R$ {maximum}.")
-        if amount_reais % self.settings.cakto_unit_price_brl:
-            raise ValueError(f"Escolha um valor múltiplo de R$ {self.settings.cakto_unit_price_brl}.")
+        if amount_reais not in self.settings.cakto_offers:
+            raise ValueError("Escolha uma das opções de recarga disponíveis.")
         row = self.store.create_payment(user_id, amount_reais * 100, customer)
         return await self.retry_payment(row["id"], user_id)
 
@@ -111,8 +111,8 @@ class Panel:
                                    f"{user_id}:{token}".encode(), hashlib.sha256).hexdigest()
             try:
                 data = await self.payments.create_pix(
-                    self.settings.cakto_offer_id, row["amount_cents"] // 100,
-                    self.settings.cakto_unit_price_brl, customer,
+                    self.settings.cakto_offers[row["amount_cents"] // 100],
+                    row["amount_cents"] // 100, customer,
                     fingerprint, row["idempotency_key"], self.settings.cakto_pix_expires,
                 )
                 self.store.payment_created(token, data)

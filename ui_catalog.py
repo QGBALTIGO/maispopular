@@ -4,7 +4,7 @@ import time
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from domain import money_brl, normalize
+from domain import family_sort_key, money_brl, normalize, platform_sort_key
 from ui_common import PAGE, btn, category_key, e, home_rows, pager, panel, say, uid
 
 
@@ -15,7 +15,7 @@ async def home(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     balance = p.store.balance_cents(uid(update)) / 100
     name = (update.effective_user.first_name or "cliente")[:60]
     await say(update,
-        f"✨ <b>Bem-vindo à {e(p.settings.bot_name)}, {e(name)}!</b>\n\n"
+        f"<b>Bem-vindo à {e(p.settings.bot_name)}, {e(name)}!</b>\n\n"
         "Escolha uma rede social, confira os detalhes e acompanhe tudo pelo próprio bot.\n\n"
         f"👛 <b>Seu saldo:</b> {money_brl(balance)}",
         home_rows(p.is_admin(uid(update))))
@@ -58,30 +58,47 @@ async def balance_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def catalog_page(update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0) -> None:
     services = await panel(context).catalog()
-    platforms = sorted({(s.platform, s.platform_emoji) for s in services}, key=lambda x: normalize(x[0]))
-    page = min(max(page, 0), max(0, (len(platforms) - 1) // PAGE))
-    rows = [[btn(f"{emoji} {name}", f"platform:{category_key(name)}:0")]
-            for name, emoji in platforms[page * PAGE:(page + 1) * PAGE]]
-    if platforms:
-        rows.append(pager("catalog", page, len(platforms)))
+    counts = {name: sum(s.platform == name for s in services) for name in {s.platform for s in services}}
+    platforms = sorted(counts, key=platform_sort_key)
+    buttons = [btn(f"{name} · {counts[name]}", f"platform:{category_key(name)}:0")
+               for name in platforms]
+    rows = [buttons[index:index + 2] for index in range(0, len(buttons), 2)]
     rows += [[btn("🔎 Buscar serviço", "search_prompt"), btn("🏠 Início", "home")]]
     await say(update,
         f"🛍️ <b>Catálogo</b>\n\n{len(services)} serviços disponíveis em {len(platforms)} áreas.\n\n"
-        "Escolha onde você quer crescer:", rows)
+        "Escolha a rede ou plataforma:", rows)
 
 
 async def platform_page(update: Update, context: ContextTypes.DEFAULT_TYPE, key: str, page: int) -> None:
     services = [s for s in await panel(context).catalog() if category_key(s.platform) == key]
     if not services:
         raise ValueError("Esta categoria não está mais disponível. Reabra o catálogo.")
-    page = min(max(page, 0), (len(services) - 1) // PAGE)
-    rows = [[btn(f"#{s.id} · {s.name[:47]}", f"service:{s.id}")]
-            for s in services[page * PAGE:(page + 1) * PAGE]]
-    rows += [pager(f"platform:{key}", page, len(services)),
-             [btn("🌐 Redes sociais", "catalog:0"), btn("🏠 Início", "home")]]
+    counts = {name: sum(s.family == name for s in services) for name in {s.family for s in services}}
+    families = sorted(counts, key=family_sort_key)
+    buttons = [btn(f"{name} · {counts[name]}",
+                   f"family:{key}:{category_key(name)}:0") for name in families]
+    rows = [buttons[index:index + 2] for index in range(0, len(buttons), 2)]
+    rows += [[btn("🌐 Todas as redes", "catalog:0"), btn("🏠 Início", "home")]]
     await say(update,
-        f"{services[0].platform_emoji} <b>{e(services[0].platform)}</b>\n\n"
-        f"{len(services)} opções disponíveis. Os valores finais aparecem nos detalhes e no resumo.", rows)
+        f"<b>{e(services[0].platform)}</b>\n\n"
+        f"{len(services)} serviços. Escolha o tipo que você procura:", rows)
+
+
+async def family_page(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                      platform_key: str, family_key: str, page: int) -> None:
+    services = [s for s in await panel(context).catalog()
+                if category_key(s.platform) == platform_key and category_key(s.family) == family_key]
+    if not services:
+        raise ValueError("Esta opção não está mais disponível. Reabra o catálogo.")
+    page = min(max(page, 0), (len(services) - 1) // PAGE)
+    rows = [[btn(f"#{s.id} · {s.name[:42]}", f"service:{s.id}")]
+            for s in services[page * PAGE:(page + 1) * PAGE]]
+    rows += [pager(f"family:{platform_key}:{family_key}", page, len(services)),
+             [btn(f"↩️ Tipos de {services[0].platform[:22]}", f"platform:{platform_key}:0"),
+              btn("🏠 Início", "home")]]
+    await say(update,
+        f"<b>{e(services[0].platform)} · {e(services[0].family)}</b>\n\n"
+        f"{len(services)} opção(ões). Toque em uma para ver preço, limites e descrição:", rows)
 
 
 async def search_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -112,7 +129,7 @@ async def service_page(update: Update, context: ContextTypes.DEFAULT_TYPE, servi
     unit = "por pacote" if s.kind.casefold() == "package" else "por 1.000 unidades"
     flags = lambda value: "Disponível" if value is True else ("Indisponível" if value is False else "Consulte após a compra")
     text = (
-        f"{s.platform_emoji} <b>{e(s.name)}</b>\n\n"
+        f"<b>{e(s.name)}</b>\n\n"
         f"🏷️ Código: <code>{s.id}</code>\n"
         f"🌐 Rede: {e(s.platform)}\n"
         f"💵 Valor: <b>{money_brl(p.retail_rate(s))}</b> {unit}\n"
@@ -122,6 +139,7 @@ async def service_page(update: Update, context: ContextTypes.DEFAULT_TYPE, servi
         f"<b>Sobre o serviço</b>\n{e(s.description)}"
     )
     rows = [[btn("🛒 Comprar", f"buy:{s.id}")],
-            [btn(f"{s.platform_emoji} Voltar para {s.platform[:28]}", f"platform:{category_key(s.platform)}:0")],
+            [btn(f"↩️ Voltar para {s.family[:30]}",
+                 f"family:{category_key(s.platform)}:{category_key(s.family)}:0")],
             [btn("🏠 Início", "home")]]
     await say(update, text, rows)

@@ -12,7 +12,7 @@ recarga Pix pela Cakto e acompanhamento automático de pedidos.
 - Descrições vêm do próprio serviço e são higienizadas para remover HTML, links e marca externa.
 - Preço final em reais calculado com multiplicador obrigatório de 2 sobre o custo da API.
 - Carteira por usuário, histórico de movimentações e débito atômico na confirmação.
-- Pix com QR Code e copia-e-cola. Recarga mínima de R$ 20, em múltiplos de R$ 5.
+- Pix com QR Code e copia-e-cola. Recargas de R$ 20, R$ 50, R$ 100 ou R$ 200.
 - Crédito automático após confirmação do pagamento e reversão idempotente em estorno/chargeback.
 - Histórico, atualização automática, reposição e cancelamento quando disponíveis.
 
@@ -34,8 +34,8 @@ implantação e manutenção sem melhorar a compra curta de rede → serviço �
 ## Configuração
 
 Requer Python 3.11 ou superior. Copie `.env.example` para `.env` e preencha as credenciais.
-A oferta configurada em `CAKTO_OFFER_ID` deve estar ativa, ser de pagamento único e ter preço
-igual a `CAKTO_UNIT_PRICE_BRL`. O bot valida isso antes de começar a receber atualizações.
+Cada entrada de `CAKTO_OFFERS_JSON` associa um valor a uma oferta ativa de pagamento único
+com o mesmo preço. O bot valida todas elas antes de começar a receber atualizações.
 
 ```bash
 python3 -m venv .venv

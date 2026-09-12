@@ -42,6 +42,28 @@ PLATFORMS = (
     ("Sites e SEO", "🌐", ("website", "site ", "seo", "trafego", "tráfego")),
 )
 
+PLATFORM_PRIORITY = (
+    "Instagram", "TikTok", "YouTube", "Facebook", "Telegram", "WhatsApp",
+    "Kwai", "SnackVideo", "X / Twitter", "Threads", "Spotify", "Twitch", "Discord",
+    "LinkedIn", "Pinterest", "SoundCloud", "Kick", "Bluesky", "Google",
+    "Sites e SEO", "Streaming e Apps", "Roblox",
+)
+
+SERVICE_FAMILIES = (
+    ("Seguidores", ("seguidor", "seguidores", "follower")),
+    ("Curtidas e reações", ("curtida", "curtidas", " like", "likes", "reacao", "reaction")),
+    ("Visualizações", ("visualizacao", "visualizacoes", " view", "views")),
+    ("Comentários", ("comentario", "comentarios", "comment")),
+    ("Membros e inscritos", ("membro", "members", "inscrito", "subscriber")),
+    ("Compartilhamentos", ("compartilh", " share", "repost", "retweet")),
+    ("Alcance e impressões", ("alcance", "reach", "impress")),
+    ("Salvamentos", ("salvamento", "salvar", " save", "favorito", "favorite")),
+    ("Stories e lives", (" story", "stories", " live", "ao vivo")),
+    ("Plays e ouvintes", (" play", "plays", "ouvinte", "listener", "stream")),
+    ("Cliques e tráfego", ("clique", " click", "trafego", "visita", "visit")),
+    ("Engajamento", ("engajamento", "engagement")),
+)
+
 BLOCKED_CATALOG_WORDS = (
     "nao comprar", "não comprar", "desativado", "disabled", "servico teste",
     "serviço teste", "test service", "nao usar", "não usar", "indisponivel",
@@ -108,6 +130,29 @@ def platform_for(name: str, category: str) -> tuple[str, str]:
     return "Outros serviços", "✨"
 
 
+def platform_sort_key(name: str) -> tuple[int, str]:
+    try:
+        return PLATFORM_PRIORITY.index(name), normalize(name)
+    except ValueError:
+        return len(PLATFORM_PRIORITY), normalize(name)
+
+
+def family_for(name: str, category: str) -> str:
+    haystack = f" {normalize(category)} {normalize(name)} "
+    for label, needles in SERVICE_FAMILIES:
+        if any(normalize(needle) in haystack for needle in needles):
+            return label
+    return "Outros serviços"
+
+
+def family_sort_key(name: str) -> tuple[int, str]:
+    labels = tuple(label for label, _ in SERVICE_FAMILIES) + ("Outros serviços",)
+    try:
+        return labels.index(name), normalize(name)
+    except ValueError:
+        return len(labels), normalize(name)
+
+
 @dataclass(frozen=True)
 class Service:
     id: int
@@ -122,6 +167,7 @@ class Service:
     cancel: bool | None
     platform: str = "Outros serviços"
     platform_emoji: str = "✨"
+    family: str = "Outros serviços"
 
     @classmethod
     def parse(cls, data: dict) -> "Service":
@@ -133,12 +179,13 @@ class Service:
         name = plain(data["name"], 220)
         category = plain(data.get("category", "Outros"), 160) or "Outros"
         platform, emoji = platform_for(name, category)
+        family = family_for(name, category)
         description = plain(data.get("description") or "", 1200)
         if not description:
             description = f"Serviço de {platform} com os limites e a quantidade informados abaixo."
         return cls(service_id, name, category, str(data["type"]).strip(), rate,
                    minimum, maximum, description, capability(data.get("refill")),
-                   capability(data.get("cancel")), platform, emoji)
+                   capability(data.get("cancel")), platform, emoji, family)
 
     @property
     def supported(self) -> bool:

@@ -1,4 +1,5 @@
 """Configuração de produção carregada exclusivamente por variáveis de ambiente."""
+import json
 import os
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -51,8 +52,7 @@ class Settings:
     max_deposit_brl: Decimal
     cakto_client_id: str
     cakto_client_secret: str
-    cakto_offer_id: str
-    cakto_unit_price_brl: int
+    cakto_offers: dict[int, str]
     cakto_pix_expires: int
     fingerprint_secret: str
 
@@ -63,12 +63,12 @@ class Settings:
         key = os.getenv("PROVIDER_API_KEY", "").strip()
         client_id = os.getenv("CAKTO_CLIENT_ID", "").strip()
         client_secret = os.getenv("CAKTO_CLIENT_SECRET", "").strip()
-        offer_id = os.getenv("CAKTO_OFFER_ID", "").strip()
+        offers_raw = os.getenv("CAKTO_OFFERS_JSON", "").strip()
         fingerprint_secret = os.getenv("PAYMENT_FINGERPRINT_SECRET", "").strip()
         missing = [name for name, value in (
             ("BOT_TOKEN", token), ("PROVIDER_API_KEY", key),
             ("CAKTO_CLIENT_ID", client_id), ("CAKTO_CLIENT_SECRET", client_secret),
-            ("CAKTO_OFFER_ID", offer_id), ("PAYMENT_FINGERPRINT_SECRET", fingerprint_secret),
+            ("CAKTO_OFFERS_JSON", offers_raw), ("PAYMENT_FINGERPRINT_SECRET", fingerprint_secret),
         ) if not value or value.startswith("COLE_")]
         if missing:
             raise ValueError("Configure no .env: " + ", ".join(missing))
@@ -82,9 +82,14 @@ class Settings:
             raise ValueError("As recargas devem usar valores inteiros em reais.")
         if max_deposit < min_deposit:
             raise ValueError("MAX_DEPOSIT_BRL deve ser maior ou igual ao mínimo.")
-        unit_price = decimal_env("CAKTO_UNIT_PRICE_BRL", "5")
-        if unit_price != unit_price.to_integral_value() or min_deposit % unit_price or max_deposit % unit_price:
-            raise ValueError("A faixa de recarga deve usar múltiplos inteiros de CAKTO_UNIT_PRICE_BRL.")
+        try:
+            raw_map = json.loads(offers_raw)
+            offers = {int(amount): str(offer).strip() for amount, offer in raw_map.items()}
+        except (ValueError, TypeError, AttributeError):
+            raise ValueError("CAKTO_OFFERS_JSON deve mapear valores inteiros para IDs de oferta.") from None
+        if (not offers or any(amount < 1 or not offer for amount, offer in offers.items())
+                or min(offers) != int(min_deposit) or max(offers) != int(max_deposit)):
+            raise ValueError("As ofertas Cakto devem cobrir exatamente os limites mínimo e máximo.")
         interval = int(os.getenv("POLL_SECONDS", "60"))
         if interval < 30:
             raise ValueError("POLL_SECONDS deve ser pelo menos 30.")
@@ -105,8 +110,7 @@ class Settings:
             max_deposit_brl=max_deposit,
             cakto_client_id=client_id,
             cakto_client_secret=client_secret,
-            cakto_offer_id=offer_id,
-            cakto_unit_price_brl=int(unit_price),
+            cakto_offers=offers,
             cakto_pix_expires=pix_expires,
             fingerprint_secret=fingerprint_secret,
         )

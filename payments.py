@@ -133,20 +133,20 @@ class Cakto:
             return data
         raise PaymentUnavailable("Operação de pagamento não concluída.")
 
-    async def validate_offer(self, offer_id: str, unit_price: int) -> dict:
+    async def validate_offer(self, offer_id: str, amount: int) -> dict:
         data = await self._request("GET", f"offers/{offer_id}/")
         if data.get("status") != "active" or data.get("type") != "unique":
             raise PaymentError("A oferta de recarga precisa estar ativa e ser de pagamento único.")
-        if decimal_value(data.get("price")) != unit_price:
-            raise PaymentError("A oferta de recarga da Cakto está com valor unitário incorreto.")
+        if decimal_value(data.get("price")) != amount:
+            raise PaymentError("Uma oferta de recarga da Cakto está com o valor incorreto.")
         return data
 
-    async def create_pix(self, offer_id: str, amount_reais: int, unit_price: int, customer: dict,
+    async def create_pix(self, offer_id: str, amount_reais: int, customer: dict,
                          fingerprint: str, idempotency_key: str, pix_expires: int) -> dict:
         payload = {
             "paymentMethod": "pix",
             "customer": {**customer, "fingerprint": fingerprint},
-            "items": [{"offerId": offer_id, "quantity": amount_reais // unit_price, "offerType": "main"}],
+            "items": [{"offerId": offer_id, "offerType": "main"}],
             "metadata": {"utm_source": "telegram", "utm_medium": "bot",
                          "utm_campaign": "recarga_carteira"},
             "pixExpiresIn": pix_expires,

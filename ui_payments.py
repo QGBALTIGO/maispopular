@@ -27,16 +27,13 @@ async def deposit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     minimum = int(p.settings.min_deposit_brl)
     maximum = int(p.settings.max_deposit_brl)
     context.user_data.pop("flow", None)
-    presets = sorted({minimum, 50, 100, 200})
-    presets = [x for x in presets if minimum <= x <= maximum]
+    presets = sorted(p.settings.cakto_offers)
     rows = [[btn(money_brl(value), f"deposit_amount:{value}") for value in presets[i:i + 2]]
             for i in range(0, len(presets), 2)]
-    rows += [[btn("✍️ Outro valor", "deposit_custom")],
-             [btn("👛 Minha carteira", "balance"), btn("🏠 Início", "home")]]
+    rows += [[btn("👛 Minha carteira", "balance"), btn("🏠 Início", "home")]]
     await say(update,
         f"💳 <b>Adicionar saldo via Pix</b>\n\n"
-        f"Escolha um valor entre <b>{money_brl(minimum)}</b> e <b>{money_brl(maximum)}</b>, "
-        f"em múltiplos de {money_brl(p.settings.cakto_unit_price_brl)}.\n\n"
+        f"Escolha uma opção entre <b>{money_brl(minimum)}</b> e <b>{money_brl(maximum)}</b>.\n\n"
         "Após a aprovação do Pix, o saldo entra automaticamente na sua carteira.", rows)
 
 
@@ -44,15 +41,12 @@ async def choose_deposit(update: Update, context: ContextTypes.DEFAULT_TYPE,
                          amount: int | None = None) -> None:
     p = panel(context)
     if amount is None:
-        context.user_data["flow"] = {"step": "deposit_amount", "expires": time.time() + 900}
-        await say(update, "✍️ <b>Valor da recarga</b>\n\nEnvie somente o valor inteiro em reais. Exemplo: <code>30</code>.",
-                  [[btn("🚫 Cancelar", "deposit")]])
-        return
+        raise ValueError("Escolha um dos valores disponíveis.")
     minimum, maximum = int(p.settings.min_deposit_brl), int(p.settings.max_deposit_brl)
     if not minimum <= amount <= maximum:
         raise ValueError(f"A recarga deve ficar entre R$ {minimum} e R$ {maximum}.")
-    if amount % p.settings.cakto_unit_price_brl:
-        raise ValueError(f"Escolha um valor múltiplo de R$ {p.settings.cakto_unit_price_brl}.")
+    if amount not in p.settings.cakto_offers:
+        raise ValueError("Escolha um dos valores disponíveis.")
     context.user_data["flow"] = {"step": "deposit_name", "amount": amount,
                                  "expires": time.time() + 900}
     await say(update,
@@ -70,12 +64,7 @@ async def deposit_input(update: Update, context: ContextTypes.DEFAULT_TYPE, valu
     except TelegramError:
         # A cobrança continua segura mesmo se o Telegram não permitir apagar a mensagem.
         pass
-    if step == "deposit_amount":
-        raw = re.sub(r"\s+", "", value).replace("R$", "")
-        if not raw.isdigit():
-            raise ValueError("Envie um valor inteiro em reais, sem centavos. Exemplo: 30.")
-        await choose_deposit(update, context, int(raw))
-    elif step == "deposit_name":
+    if step == "deposit_name":
         if len(value.strip()) < 5 or " " not in value.strip():
             raise ValueError("Informe seu nome completo.")
         flow["name"] = value.strip()[:120]
