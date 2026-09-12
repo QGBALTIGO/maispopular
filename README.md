@@ -16,8 +16,9 @@ recarga Pix pela Cakto e acompanhamento automático de pedidos.
 - Crédito automático após confirmação do pagamento e reversão idempotente em estorno/chargeback.
 - Histórico, atualização automática, reposição e cancelamento quando disponíveis.
 
-O fluxo permanece nativo no Telegram. Um WebApp aumentaria a superfície de autenticação,
-implantação e manutenção sem melhorar a compra curta de rede → serviço → quantidade → confirmação.
+O catálogo principal permanece nativo no Telegram e usa três níveis curtos para celular:
+rede → tipo de serviço → opção. Uma WebApp com cálculo instantâneo pode ser adicionada quando
+houver um domínio HTTPS próprio; a implantação de produção não depende de túnel temporário.
 
 ## Segurança e consistência financeira
 
