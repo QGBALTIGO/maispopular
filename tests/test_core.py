@@ -58,7 +58,7 @@ class DomainTests(unittest.TestCase):
     def test_catalog_popularity_and_service_family(self):
         ordered = sorted(["Telegram", "YouTube", "Instagram", "Facebook"], key=platform_sort_key)
         self.assertEqual(ordered, ["Instagram", "YouTube", "Facebook", "Telegram"])
-        self.assertEqual(service(name="Instagram Curtidas Brasileiras").family, "Curtidas e reações")
+        self.assertEqual(service(name="Instagram Curtidas Brasileiras").family, "Curtidas/Reações")
         self.assertEqual(service(name="Instagram Visualizações Reels").family, "Visualizações")
 
     def test_non_product_and_unsupported_are_hidden(self):

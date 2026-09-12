@@ -51,16 +51,16 @@ PLATFORM_PRIORITY = (
 
 SERVICE_FAMILIES = (
     ("Seguidores", ("seguidor", "seguidores", "follower")),
-    ("Curtidas e reações", ("curtida", "curtidas", " like", "likes", "reacao", "reaction")),
+    ("Curtidas/Reações", ("curtida", "curtidas", " like", "likes", "reacao", "reaction")),
     ("Visualizações", ("visualizacao", "visualizacoes", " view", "views")),
     ("Comentários", ("comentario", "comentarios", "comment")),
-    ("Membros e inscritos", ("membro", "members", "inscrito", "subscriber")),
+    ("Membros/Inscritos", ("membro", "members", "inscrito", "subscriber")),
     ("Compartilhamentos", ("compartilh", " share", "repost", "retweet")),
-    ("Alcance e impressões", ("alcance", "reach", "impress")),
+    ("Alcance/Impressões", ("alcance", "reach", "impress")),
     ("Salvamentos", ("salvamento", "salvar", " save", "favorito", "favorite")),
-    ("Stories e lives", (" story", "stories", " live", "ao vivo")),
-    ("Plays e ouvintes", (" play", "plays", "ouvinte", "listener", "stream")),
-    ("Cliques e tráfego", ("clique", " click", "trafego", "visita", "visit")),
+    ("Stories/Lives", (" story", "stories", " live", "ao vivo")),
+    ("Plays/Ouvintes", (" play", "plays", "ouvinte", "listener", "stream")),
+    ("Cliques/Tráfego", ("clique", " click", "trafego", "visita", "visit")),
     ("Engajamento", ("engajamento", "engagement")),
 )
 
