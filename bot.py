@@ -42,6 +42,7 @@ from ui_catalog import (
     platform_page,
     search_page,
     search_prompt,
+    service_description_page,
     service_page,
 )
 from ui_checkout import begin_order, text_input
@@ -94,6 +95,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await service_page(update, context, int(parts[1]))
     elif action == "buy":
         await begin_order(update, context, int(parts[1]))
+    elif action == "description":
+        await service_description_page(update, context, int(parts[1]), int(parts[2]))
     elif action == "confirm":
         row = await panel(context).submit(parts[1], uid(update))
         await order_page(update, context, row["id"])

@@ -4,6 +4,7 @@ import time
 from telegram import InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
 
+from catalog_copy import presentation
 from domain import family_sort_key, money_brl, normalize, platform_sort_key
 from ui_common import PAGE, btn, category_key, e, home_rows, pager, panel, say, uid
 
@@ -130,6 +131,8 @@ async def search_page(update: Update, context: ContextTypes.DEFAULT_TYPE, page: 
 async def service_page(update: Update, context: ContextTypes.DEFAULT_TYPE, service_id: int) -> None:
     p = panel(context)
     s = await p.service(service_id)
+    copy = presentation(s)
+    description = copy["details"]
     unit = "por pacote" if s.kind.casefold() == "package" else "por 1.000 unidades"
     flags = lambda value: "Disponível" if value is True else ("Indisponível" if value is False else "Consulte após a compra")
     text = (
@@ -140,10 +143,28 @@ async def service_page(update: Update, context: ContextTypes.DEFAULT_TYPE, servi
         f"📏 Mínimo: <b>{s.minimum}</b> · Máximo: <b>{s.maximum}</b>\n"
         f"♻️ Reposição: {flags(s.refill)}\n"
         f"🚫 Cancelamento: {flags(s.cancel)}\n\n"
-        f"<b>Sobre o serviço</b>\n{e(s.description)}"
+        f"<b>Sobre o serviço</b>\n{e(description[:1800])}"
+        + ("\n\nLeia a descrição completa abaixo para conferir todas as condições." if len(description) > 1800 else "")
     )
     rows = [[btn("🛒 Comprar", f"buy:{s.id}")],
             [btn(f"↩️ Voltar para {s.family[:30]}",
                  f"family:{category_key(s.platform)}:{category_key(s.family)}:0")],
             [btn("🏠 Início", "home")]]
+    if len(description) > 1800:
+        rows.insert(0, [btn("📄 Ler descrição completa", f"description:{s.id}:0")])
     await say(update, text, rows)
+
+
+async def service_description_page(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                                   service_id: int, page: int = 0) -> None:
+    s = await panel(context).service(service_id)
+    description = presentation(s)["details"]
+    pages = [description[i:i + 2800] for i in range(0, len(description), 2800)] or ["Sem descrição adicional."]
+    page = min(max(0, page), len(pages) - 1)
+    navigation = []
+    if page > 0:
+        navigation.append(btn("← Anterior", f"description:{s.id}:{page - 1}"))
+    if page + 1 < len(pages):
+        navigation.append(btn("Próxima →", f"description:{s.id}:{page + 1}"))
+    rows = ([navigation] if navigation else []) + [[btn("↩️ Voltar ao serviço", f"service:{s.id}")]]
+    await say(update, f"<b>Descrição · {s.id}</b> ({page + 1}/{len(pages)})\n\n{e(pages[page])}", rows)
