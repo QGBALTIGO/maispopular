@@ -151,6 +151,7 @@ span[data-icon] {
   margin-top: 5px;
 }
 .balance {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -178,6 +179,26 @@ span[data-icon] {
   width: 14px;
   height: 14px;
   color: var(--blue);
+}
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  color: var(--muted);
+}
+.theme-sun {
+  display: none;
+}
+:root[data-theme="dark"] .theme-sun {
+  display: initial;
+}
+:root[data-theme="dark"] .theme-moon {
+  display: none;
 }
 .page-intro {
   margin: 6px 0 28px;
@@ -1243,7 +1264,7 @@ span[data-icon] {
     padding-right: 15px;
   }
   .brand > span {
-    font-size: 13px;
+    display: none;
   }
   .brand img {
     width: 34px;
@@ -1269,6 +1290,127 @@ span[data-icon] {
   .checkout-bar .primary-button {
     padding: 12px;
   }
+}
+@media (min-width: 360px) and (max-width: 430px) {
+  .topbar {
+    gap: 7px;
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+  .brand > span {
+    font-size: 13px;
+  }
+  .brand small {
+    font-size: 7px;
+    letter-spacing: 0.8px;
+  }
+  .brand img {
+    width: 34px;
+    height: 34px;
+  }
+  .balance {
+    gap: 5px;
+    padding: 8px;
+  }
+  .balance-plus {
+    display: none !important;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #101722;
+  --paper: #192332;
+  --ink: #edf2fa;
+  --muted: #a5b3c8;
+  --line: #2e3c50;
+  --blue: #8ab4ff;
+  --blue-soft: #223654;
+}
+:root[data-theme="dark"]
+  :is(
+    .family-card,
+    .search,
+    .field input,
+    .field textarea,
+    .quantity-chips button,
+    .checkout-bar,
+    .secondary-button,
+    .activity-list,
+    .modal
+  ) {
+  background: var(--paper);
+  border-color: var(--line);
+}
+:root[data-theme="dark"]
+  :is(
+    .reassurance,
+    .service-code,
+    .brand-disclaimer,
+    #selectedDescription,
+    .bottom-nav button,
+    .field input::placeholder,
+    .field textarea::placeholder
+  ) {
+  color: var(--muted);
+}
+:root[data-theme="dark"] .bottom-nav {
+  background: #101722ed;
+}
+:root[data-theme="dark"] .bottom-nav button.active {
+  color: var(--blue);
+}
+:root[data-theme="dark"] .service-footer {
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .chip {
+  background: #253246;
+  color: #c1cee0;
+}
+:root[data-theme="dark"]
+  :is(.notice, .chip.warning, .order-card .status.attention) {
+  background: #342a1b;
+  color: #f1cc89;
+  border-color: #5a472a;
+}
+:root[data-theme="dark"] :is(.success-mark, .order-card .status.complete) {
+  background: #193c33;
+  color: #80dec0;
+}
+:root[data-theme="dark"] .positive {
+  color: #80dec0;
+}
+:root[data-theme="dark"] .field-error {
+  color: #ffac98;
+}
+:root[data-theme="dark"] .primary-button {
+  background: #2864cd;
+  color: #fff;
+}
+:root[data-theme="dark"] .primary-button:hover {
+  background: #215abe;
+}
+:root[data-theme="dark"] .wallet-card .primary-button {
+  background: #edf2fa;
+  color: #17263f;
+}
+:root[data-theme="dark"] .quantity-chips button.selected {
+  background: var(--blue-soft);
+  border-color: var(--blue);
+}
+:root[data-theme="dark"] :is(.wallet-card, .subscription-entry) {
+  border: 1px solid #344762;
+}
+:root[data-theme="dark"] .toast {
+  background: #edf2fa;
+  color: #17263f;
+}
+:root[data-theme="dark"] .skeleton {
+  background-image: linear-gradient(
+    100deg,
+    #1b283a 25%,
+    #26364c 40%,
+    #1b283a 60%
+  );
 }
 @media (prefers-reduced-motion: reduce) {
   *,

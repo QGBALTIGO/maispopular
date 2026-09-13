@@ -9,8 +9,9 @@
     <meta name="theme-color" content="#f7f8fa" />
     <title>Mais Popular • Sua loja digital</title>
     <link rel="icon" href="/assets/logo.jpg" />
-    <link rel="stylesheet" href="/assets/app.css?v=3" />
+    <link rel="stylesheet" href="/assets/app.css?v=4" />
     <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+    <script src="/assets/theme.js?v=4"></script>
   </head>
   <body>
     <header class="topbar">
@@ -27,6 +28,33 @@
         ><span
           ><small>Seu saldo</small><strong id="balanceLabel">—</strong></span
         ><span data-icon="plus" class="balance-plus"></span>
+      </button>
+      <button
+        id="themeToggle"
+        class="theme-toggle"
+        type="button"
+        aria-label="Tema escuro"
+        aria-pressed="false"
+        title="Tema escuro"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+          aria-hidden="true"
+        >
+          <path
+            class="theme-moon"
+            d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"
+          />
+          <g class="theme-sun">
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"
+            />
+          </g>
+        </svg>
       </button>
     </header>
     <main class="shell" id="main">
@@ -201,7 +229,7 @@
             <p>Use seu saldo em qualquer serviço do catálogo.</p>
             <button id="depositButton" class="primary-button">
               <span data-icon="plus"></span>Adicionar saldo com Pix</button
-            ><small>Recarga a partir de R$ 20 · Pagamento pela Cakto</small>
+            ><small>Recarga a partir de R$ 20 · Pague com Pix</small>
           </div>
           <div class="section-heading">
             <h2>Últimas movimentações</h2>
@@ -232,7 +260,7 @@
             <h1>Como podemos ajudar?</h1>
           </div>
           <div class="faq">
-            <details open>
+            <details name="help-faq" open>
               <summary>
                 Como fazer um pedido?<span data-icon="chevron"></span>
               </summary>
@@ -242,17 +270,17 @@
                 usando seu saldo.
               </p>
             </details>
-            <details>
+            <details name="help-faq">
               <summary>
                 Como adicionar saldo?<span data-icon="chevron"></span>
               </summary>
               <p>
                 Na Carteira, toque em Adicionar saldo com Pix. Você volta ao bot
-                para escolher um valor a partir de R$ 20 e gerar a cobrança pela
-                Cakto. Após o pagamento ser confirmado, atualize seu saldo.
+                para escolher um valor a partir de R$ 20 e gerar seu Pix. Após o
+                pagamento ser confirmado, atualize seu saldo.
               </p>
             </details>
-            <details>
+            <details name="help-faq">
               <summary>
                 Quando meu pedido será entregue?<span
                   data-icon="chevron"
@@ -264,7 +292,7 @@
                 pedido não significa que o acesso já foi entregue.
               </p>
             </details>
-            <details>
+            <details name="help-faq">
               <summary>
                 Posso cancelar ou pedir reposição?<span
                   data-icon="chevron"
@@ -277,11 +305,15 @@
               </p>
             </details>
           </div>
-          <button id="openBotHelp" class="secondary-button">
-            <span data-icon="telegram"></span>Abrir atendimento no bot<span
+          <a
+            id="openBotHelp"
+            class="secondary-button"
+            href="https://t.me/suportemaispopular"
+          >
+            <span data-icon="telegram"></span>Falar com suporte<span
               data-icon="arrow"
             ></span>
-          </button>
+          </a>
           <p class="brand-disclaimer">
             Mais Popular é uma loja independente. As marcas identificam os
             serviços e pertencem aos seus respectivos titulares.
@@ -360,6 +392,6 @@
         </button>
       </div>
     </dialog>
-    <script src="/assets/app.js?v=3" defer></script>
+    <script src="/assets/app.js?v=4" defer></script>
   </body>
 </html>

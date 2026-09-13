@@ -126,8 +126,7 @@ class Cakto:
             except ValueError:
                 raise PaymentUnavailable("O meio de pagamento retornou uma resposta inválida.") from None
             if not response.is_success:
-                detail = data.get("detail") if isinstance(data, dict) else None
-                raise PaymentError(self._safe_error(detail or "Cobrança recusada pela Cakto."))
+                raise PaymentError("Não foi possível gerar a cobrança. Confira os dados ou fale com o suporte.")
             if not isinstance(data, dict):
                 raise PaymentUnavailable("O meio de pagamento retornou um formato inválido.")
             return data
@@ -138,7 +137,7 @@ class Cakto:
         if data.get("status") != "active" or data.get("type") != "unique":
             raise PaymentError("A oferta de recarga precisa estar ativa e ser de pagamento único.")
         if decimal_value(data.get("price")) != amount:
-            raise PaymentError("Uma oferta de recarga da Cakto está com o valor incorreto.")
+            raise PaymentError("Uma oferta de recarga está com o valor incorreto. Fale com o suporte.")
         return data
 
     async def create_pix(self, offer_id: str, amount_reais: int, customer: dict,
@@ -156,7 +155,7 @@ class Cakto:
         if not data.get("id") or not isinstance(data.get("pix"), dict) or not data["pix"].get("qrCode"):
             raise PaymentUnavailable("A cobrança foi criada sem os dados completos do Pix.")
         if decimal_value(data.get("baseAmount")) != amount_reais:
-            raise PaymentUnavailable("A Cakto retornou um valor diferente da recarga solicitada.")
+            raise PaymentUnavailable("O valor recebido não corresponde à recarga solicitada.")
         return data
 
     async def order(self, order_id: str) -> dict:

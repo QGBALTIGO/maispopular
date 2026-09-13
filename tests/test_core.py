@@ -225,6 +225,21 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
 
 
 class CaktoClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_provider_rejection_does_not_expose_brand_or_raw_details(self):
+        def handler(request):
+            if request.url.path.endswith("/token/"):
+                return httpx.Response(200, json={"access_token": "access", "expires_in": 3600})
+            return httpx.Response(400, json={"detail": "Cakto secret u@example.com"})
+        client = Cakto("id", "secret", transport=httpx.MockTransport(handler))
+        try:
+            with self.assertRaises(PaymentError) as error:
+                await client.validate_offer("offer", 20)
+            self.assertIn("suporte", str(error.exception))
+            for forbidden in ("cakto", "secret", "u@example.com"):
+                self.assertNotIn(forbidden, str(error.exception).lower())
+        finally:
+            await client.close()
+
     async def test_pix_request_is_authenticated_and_idempotent(self):
         calls = []
         def handler(request):

@@ -779,7 +779,21 @@ $("orderForm").addEventListener("submit", review);
 $("confirmButton").addEventListener("click", confirmOrder);
 $("depositButton").addEventListener("click", () => openBot("deposit"));
 $("modalDeposit").addEventListener("click", () => openBot("deposit"));
-$("openBotHelp").addEventListener("click", () => openBot("help"));
+$("openBotHelp").addEventListener("click", (event) => {
+  if (tg?.openTelegramLink) {
+    event.preventDefault();
+    tg.openTelegramLink("https://t.me/suportemaispopular");
+  }
+});
+// Fallback for older Telegram WebViews without named-details support.
+document.querySelectorAll(".faq details").forEach((detail) => {
+  detail.addEventListener("toggle", () => {
+    if (!detail.open) return;
+    document.querySelectorAll(".faq details").forEach((other) => {
+      if (other !== detail) other.open = false;
+    });
+  });
+});
 $("refreshWallet").addEventListener("click", loadWallet);
 $("refreshOrders").addEventListener("click", () => loadOrders());
 $("moreOrders").addEventListener("click", () => loadOrders(true));
@@ -790,8 +804,6 @@ if (tg) {
   tg.ready();
   tg.expand();
   if (initData && tg.isVersionAtLeast?.("6.1")) {
-    tg.setHeaderColor("#f7f8fa");
-    tg.setBackgroundColor("#f7f8fa");
     tg.BackButton?.onClick(goBack);
   }
 }

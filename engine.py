@@ -129,7 +129,7 @@ class Panel:
         data = await self.payments.order(row["cakto_order_id"])
         expected = Decimal(row["amount_cents"]) / 100
         if decimal_value(data.get("baseAmount")) != expected:
-            raise PaymentError("O valor retornado pela Cakto não corresponde à recarga.")
+            raise PaymentError("O valor recebido não corresponde à recarga.")
         return self.store.update_payment_status(token, data["status"])
 
     async def prepare_action(self, token: str, user_id: int, kind: str) -> dict:

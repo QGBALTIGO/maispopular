@@ -51,10 +51,14 @@ def main() -> None:
         assert any("Netflix" in name for name in names)
         assert any("YouTube Premium" in name for name in names)
         assert any("Disney+" in name for name in names)
-        for path in ("/assets/app.js?v=3", "/assets/app.css?v=3", "/assets/logo.jpg",
+        for path in ("/assets/app.js?v=4", "/assets/app.css?v=4", "/assets/theme.js?v=4", "/assets/logo.jpg",
                      "/assets/brands/instagram.svg", "/assets/brands/kwai.png"):
             client.get(path).raise_for_status()
         assert "bottomNav" in page.text
+        assert 'id="themeToggle"' in page.text
+        assert 'name="help-faq"' in page.text
+        assert 'href="https://t.me/suportemaispopular"' in page.text
+        assert "cakto" not in page.text.lower()
     payload = catalog.json()
     assert denied.status_code == 401
     assert "content-security-policy" in page.headers

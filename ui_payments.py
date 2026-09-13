@@ -4,7 +4,6 @@ import time
 from io import BytesIO
 
 import qrcode
-from telegram import InlineKeyboardButton as Button
 from telegram import InlineKeyboardMarkup as Keyboard
 from telegram import Update
 from telegram.error import TelegramError
@@ -110,14 +109,12 @@ async def payment_page(update: Update, context: ContextTypes.DEFAULT_TYPE, token
     if row["expires_at"] and row["status"] == "PENDING":
         text += f"\n⌛ Validade do Pix: {e(row['expires_at'])}"
     if row["error"]:
-        text += f"\n\n⚠️ {e(row['error'])}"
+        text += "\n\n⚠️ Não foi possível concluir a operação. Tente consultar novamente ou fale com o suporte."
     rows = []
     if row["status"] == "UNKNOWN":
         rows.append([btn("🔄 Tentar gerar novamente", f"payment_retry:{token}")])
     if row["status"] == "PENDING":
         rows.append([btn("🔄 Já paguei · verificar", f"payment_refresh:{token}")])
-        if row["checkout_url"].startswith("https://pay.cakto.com.br/"):
-            rows.append([Button("🔗 Abrir página do Pix", url=row["checkout_url"])])
     rows.append([btn("💳 Minha carteira", "balance"), btn("🏠 Início", "home")])
     await say(update, text, rows)
     if refresh and row["status"] in {"PAID", "REVERSED", "FAILED"}:

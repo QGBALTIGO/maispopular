@@ -28,9 +28,8 @@ async def identity(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def help_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    admins = sorted(panel(context).settings.admin_ids)
-    rows = ([[InlineKeyboardButton("💬 Falar com atendimento", url=f"tg://user?id={admins[0]}")]]
-            if admins else [])
+    rows = [[InlineKeyboardButton("💬 Falar com atendimento",
+                                  url="https://t.me/suportemaispopular")]]
     rows.append([btn("🏠 Início", "home")])
     await say(update,
         "❓ <b>Como comprar</b>\n\n"
