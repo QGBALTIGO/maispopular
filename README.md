@@ -12,8 +12,9 @@ recarga Pix pela Cakto e acompanhamento automático de pedidos.
 - Descrições vêm do próprio serviço e são higienizadas para remover HTML, links e marca externa.
 - Preço final em reais calculado com multiplicador obrigatório de 2 sobre o custo da API.
 - Carteira por usuário, histórico de movimentações e débito atômico na confirmação.
-- Pix com QR Code e copia-e-cola. Recargas de R$ 20, R$ 50, R$ 100 ou R$ 200.
+- Pix com QR Code e copia-e-cola. Recargas de R$ 20 a R$ 100 em intervalos de R$ 5.
 - Crédito automático após confirmação do pagamento e reversão idempotente em estorno/chargeback.
+- Programa de afiliados: link individual e bônus de 15% sobre cada recarga aprovada do indicado.
 - Histórico, atualização automática, reposição e cancelamento quando disponíveis.
 
 O catálogo permanece disponível nativamente no Telegram e também no Mini App. A interface
@@ -32,6 +33,9 @@ confirmação final com o preço recalculado pelo servidor. Toda operação aute
 - Pagamentos e pedidos são consultados periodicamente sem reenviar operações de compra.
 - SQLite usa WAL, `synchronous=FULL`, transações imediatas e trilha contábil imutável por referência.
 - CPF e dados de cobrança são apagados do banco local após a criação ou rejeição definitiva do Pix.
+- Comissão de afiliado é vinculada uma única vez, impede autoindicação/ciclos e acompanha estornos.
+- Broadcast administrativo usa destinatários congelados, confirmação, idempotência, progresso, cancelamento e retomada segura após reinício.
+- Banners personalizados são convertidos para WebP e servidos com cache imutável por revisão.
 
 ## Configuração
 
@@ -61,6 +65,7 @@ python bot.py
 | `/pedidos` | Acompanhar compras |
 | `/pedido CODIGO` | Abrir um pedido próprio |
 | `/ajuda` | Instruções |
+| `/afiliados` | Abrir o programa de indicação |
 | `/admin` | Abrir painel administrativo no Web App |
 | `/darsaldo ID VALOR MOTIVO` | Creditar carteira (somente administradores) |
 
@@ -74,6 +79,10 @@ Exemplo: `/darsaldo 123456789 25,00 Bonificação de atendimento`. O cliente pre
 ter aberto o bot. São aceitos créditos positivos de R$ 0,01 a R$ 5.000,00. Cada
 lançamento registra cliente, administrador, valor e motivo; reentregas do mesmo
 update do Telegram ou da mesma confirmação HTTP não duplicam o crédito.
+
+O painel administrativo do Web App também permite criar transmissões em texto,
+acrescentar um botão de ação, revisar a prévia, acompanhar entregas/falhas e cancelar
+os envios restantes. Apenas uma transmissão pode ficar ativa por vez.
 
 A recarga do Mini App usa Pix nativo, com QR, copia e cola, histórico, retomada
 da tentativa e consulta de confirmação. Os dados reais do pagador são exigidos

@@ -126,6 +126,31 @@ class StoreTests(unittest.TestCase):
         self.store.payment_notified(row["id"], "paid")
         self.assertIn(row["id"], {item["id"] for item in self.store.pending_payments()})
 
+    def test_affiliate_receives_fifteen_percent_once_and_reversal_once(self):
+        self.store.register_user(2, "partner", "Partner")
+        self.assertTrue(self.store.bind_referrer(1, 2))
+        row = self.paid_wallet(20)
+        self.assertEqual(self.store.balance_cents(2), 300)
+        self.store.update_payment_status(row["id"], "paid")
+        self.assertEqual(self.store.balance_cents(2), 300)
+        summary = self.store.affiliate_summary(2)
+        self.assertEqual((summary["invited"], summary["earnedCents"]), (1, 300))
+        self.store.update_payment_status(row["id"], "refunded")
+        self.store.update_payment_status(row["id"], "refunded")
+        self.assertEqual(self.store.balance_cents(2), 0)
+        self.assertEqual(self.store.affiliate_summary(2)["earnedCents"], 0)
+
+    def test_affiliate_binding_is_permanent_and_rejects_abuse(self):
+        self.store.register_user(2, "partner", "Partner")
+        self.store.register_user(3, "other", "Other")
+        with self.assertRaisesRegex(ValueError, "próprio"):
+            self.store.bind_referrer(1, 1)
+        self.assertTrue(self.store.bind_referrer(1, 2))
+        self.assertFalse(self.store.bind_referrer(1, 3))
+        self.assertTrue(self.store.bind_referrer(3, 1))
+        with self.assertRaisesRegex(ValueError, "vínculo inválido"):
+            self.store.bind_referrer(2, 3)
+
     def test_order_claim_debits_and_refund_is_idempotent(self):
         self.paid_wallet(20)
         row = self.store.create_order(1, service(), {"service": 42, "link": "@abc", "quantity": 100},

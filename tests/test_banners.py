@@ -44,8 +44,11 @@ class BannerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(item["revision"], 1)
         self.assertTrue(item["custom"])
         content = await self.client.get(item["url"])
-        self.assertEqual(content.headers["content-type"], "image/png")
-        self.assertEqual(content.content, base64.b64decode(self.image()))
+        self.assertEqual(content.headers["content-type"], "image/webp")
+        self.assertIn("immutable", content.headers["cache-control"])
+        with Image.open(BytesIO(content.content)) as rendered:
+            self.assertEqual(rendered.format, "WEBP")
+            self.assertEqual(rendered.size, (160, 90))
         second = Store(self.panel.settings.db_path)
         try:
             self.assertEqual(banners.listing(second)[0]["position"], "top")
@@ -125,6 +128,8 @@ class BannerTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('id="reviewsSection"', home)
         self.assertNotIn("/assets/reviews.js", home)
         self.assertIn('id="manageBanners"', home)
+        self.assertIn('id="manageBroadcasts"', home)
+        self.assertIn('id="affiliateEntry"', home)
         self.assertLess(home.index('id="heroSlides"'), home.index('id="socialSection"'))
         platform = (
             await self.client.get("/api/bootstrap", headers=self.headers)
@@ -132,3 +137,16 @@ class BannerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(platform["fromPriceLabel"], "R$ 0,02")
         self.assertTrue(platform["summary"])
         self.assertEqual(platform["fromMinimum"], 100)
+
+    async def test_existing_images_can_be_optimized_once(self):
+        raw = base64.b64decode(self.image())
+        with self.store.db:
+            self.store.db.execute(
+                "INSERT INTO shop_banners VALUES(1,'Teste','social','cover','center',?,'image/png',1,7,1)",
+                (raw,),
+            )
+        result = banners.optimize_stored_images(self.store)
+        self.assertEqual(result["changed"], 1)
+        row = self.store.db.execute("SELECT mime,revision,image FROM shop_banners").fetchone()
+        self.assertEqual((row["mime"], row["revision"]), ("image/webp", 2))
+        self.assertEqual(banners.optimize_stored_images(self.store)["changed"], 0)

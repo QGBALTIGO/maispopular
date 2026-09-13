@@ -3,6 +3,7 @@
   const navigate = (view) => {
     if (view === "wallet") loadWallet();
     else if (view === "orders") loadOrders();
+    else if (view === "affiliate") loadAffiliate();
     else show(view);
   };
   $("openShopMenu").addEventListener("click", () => {

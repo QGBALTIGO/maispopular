@@ -340,6 +340,7 @@ async function loadAdmin() {
         ["Pedidos", stats.orders],
         ["Saldo dos clientes", formatMoney(stats.wallet_cents / 100)],
         ["Recargas aprovadas", formatMoney(stats.paid_cents / 100)],
+        ["Bônus de afiliados", formatMoney(stats.affiliate_cents / 100)],
         ["Recargas abertas", stats.pending_payments],
         ["Capacidade operacional", stats.operationalLabel],
       ].map(([label, value]) => {
@@ -614,6 +615,7 @@ window.storeOperations = {
     const view = new URLSearchParams(location.search).get("view");
     if (view === "deposit") openDeposit();
     else if (view === "admin") loadAdmin();
+    else if (view === "affiliate") loadAffiliate();
     else if (["wallet", "orders", "help"].includes(view)) navigate(view);
   },
 };

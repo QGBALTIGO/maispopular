@@ -6,11 +6,12 @@ import time
 from io import BytesIO
 from typing import Literal
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field
 
 MAX_IMAGE = 4 * 1024 * 1024
 MAX_BODY = 6 * 1024 * 1024
+MAX_RENDER_DIMENSION = 1600
 TARGETS = {
     "social": "#socialSection",
     "streaming": "#streamingSection",
@@ -67,13 +68,7 @@ def listing(store):
     return items
 
 
-def validate_image(encoded):
-    if not encoded:
-        return None, ""
-    try:
-        data = base64.b64decode(encoded, validate=True)
-    except (ValueError, binascii.Error):
-        raise ValueError("Arquivo de imagem inválido.") from None
+def optimize_raster(data: bytes) -> tuple[bytes, str]:
     if len(data) > MAX_IMAGE:
         raise ValueError("Use uma imagem de até 4 MB.")
     try:
@@ -91,6 +86,15 @@ def validate_image(encoded):
             image.verify()
         with Image.open(BytesIO(data)) as image:
             image.load()
+            image = ImageOps.exif_transpose(image)
+            image.thumbnail(
+                (MAX_RENDER_DIMENSION, MAX_RENDER_DIMENSION),
+                Image.Resampling.LANCZOS,
+            )
+            if image.mode not in {"RGB", "RGBA"}:
+                image = image.convert("RGBA" if "transparency" in image.info else "RGB")
+            output = BytesIO()
+            image.save(output, format="WEBP", quality=84, method=6)
     except (
         UnidentifiedImageError,
         OSError,
@@ -100,7 +104,55 @@ def validate_image(encoded):
         raise ValueError(
             "A imagem está corrompida ou excede o tamanho permitido."
         ) from None
-    return data, mime
+    return output.getvalue(), "image/webp"
+
+
+def validate_image(encoded):
+    if not encoded:
+        return None, ""
+    try:
+        data = base64.b64decode(encoded, validate=True)
+    except (ValueError, binascii.Error):
+        raise ValueError("Arquivo de imagem inválido.") from None
+    return optimize_raster(data)
+
+
+def optimize_stored_images(store) -> dict:
+    """Cria rendições leves dos banners existentes; execute após backup do SQLite."""
+    changed = before = after = 0
+    store.db.execute("BEGIN IMMEDIATE")
+    try:
+        for table, key in (
+            ("shop_banners", "slot"),
+            ("product_banners", "service_id"),
+            ("platform_banners", "platform"),
+        ):
+            rows = store.db.execute(
+                f"SELECT {key},image,mime FROM {table} WHERE image IS NOT NULL"
+            ).fetchall()
+            for row in rows:
+                source = bytes(row["image"])
+                before += len(source)
+                try:
+                    with Image.open(BytesIO(source)) as current:
+                        oversized = max(current.size) > MAX_RENDER_DIMENSION
+                except (UnidentifiedImageError, OSError):
+                    oversized = True
+                if row["mime"] == "image/webp" and not oversized and len(source) <= 700_000:
+                    rendered = source
+                else:
+                    rendered, _ = optimize_raster(source)
+                    store.db.execute(
+                        f"UPDATE {table} SET image=?,mime='image/webp',revision=revision+1 WHERE {key}=?",
+                        (rendered, row[key]),
+                    )
+                    changed += 1
+                after += len(rendered)
+        store.db.commit()
+    except BaseException:
+        store.db.rollback()
+        raise
+    return {"changed": changed, "before": before, "after": after}
 
 
 def save(store, actor, slot, payload, data, mime):

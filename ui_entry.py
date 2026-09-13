@@ -12,6 +12,7 @@ async def open_view(update, context, view="platforms"):
     if not url:
         raise ValueError("A loja está reconectando. Tente novamente em alguns instantes.")
     labels = {"wallet": "💳 Abrir carteira", "deposit": "💠 Adicionar saldo", "orders": "📦 Meus pedidos",
+              "affiliate": "🤝 Abrir programa de afiliados",
               "help": "💬 Ajuda e suporte", "admin": "⚙️ Abrir administração", "platforms": "🛒 Abrir catálogo"}
     await say(update, "<b>Mais Popular</b>\n\nContinue pelo Web App. Tudo é feito dentro da sua loja.",
               [[web_btn(labels.get(view, "🛒 Abrir loja"), f"{url}?view={view}")]])
@@ -19,7 +20,10 @@ async def open_view(update, context, view="platforms"):
 
 async def start(update, context):
     start_arg = context.args[0] if context.args else ""
-    if start_arg in {"deposit", "help", "admin", "wallet", "orders"}:
+    if start_arg.startswith("aff_") and start_arg[4:].isdigit():
+        panel(context).store.bind_referrer(uid(update), int(start_arg[4:]))
+        return await open_view(update, context, "affiliate")
+    if start_arg in {"deposit", "help", "admin", "wallet", "orders", "affiliate"}:
         return await open_view(update, context, start_arg)
     if start_arg.startswith("order_"):
         return await open_view(update, context, "orders")
@@ -29,7 +33,7 @@ async def start(update, context):
 async def command(update, context):
     name = update.effective_message.text.split()[0].split("@")[0].lower()
     view = {"/saldo": "wallet", "/recarga": "deposit", "/pedidos": "orders", "/pedido": "orders",
-            "/ajuda": "help", "/admin": "admin", "/resolver": "admin"}.get(name, "platforms")
+            "/ajuda": "help", "/afiliados": "affiliate", "/admin": "admin", "/resolver": "admin"}.get(name, "platforms")
     await open_view(update, context, view)
 
 

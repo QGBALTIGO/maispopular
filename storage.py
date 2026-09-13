@@ -22,7 +22,8 @@ class Store:
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY, username TEXT NOT NULL DEFAULT '',
             display_name TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
+            updated_at INTEGER NOT NULL, referred_by INTEGER NOT NULL DEFAULT 0,
+            referred_at INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS wallets (
             user_id INTEGER PRIMARY KEY REFERENCES users(user_id),
@@ -119,7 +120,37 @@ class Store:
             operation TEXT NOT NULL, old_value TEXT NOT NULL, new_value TEXT NOT NULL,
             reason TEXT NOT NULL, created_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS affiliate_commissions (
+            payment_id TEXT PRIMARY KEY REFERENCES payments(id),
+            referred_user_id INTEGER NOT NULL REFERENCES users(user_id),
+            referrer_id INTEGER NOT NULL REFERENCES users(user_id),
+            amount_cents INTEGER NOT NULL CHECK(amount_cents>0),
+            status TEXT NOT NULL CHECK(status IN ('ACTIVE','REVERSED')),
+            created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS affiliate_referrer ON affiliate_commissions(referrer_id,created_at DESC);
+        CREATE TABLE IF NOT EXISTS broadcasts (
+            id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, admin_id INTEGER NOT NULL,
+            message TEXT NOT NULL, button_text TEXT NOT NULL DEFAULT '',
+            button_target TEXT NOT NULL DEFAULT 'none', status TEXT NOT NULL,
+            total INTEGER NOT NULL DEFAULT 0, sent INTEGER NOT NULL DEFAULT 0,
+            failed INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL,
+            started_at INTEGER NOT NULL DEFAULT 0, finished_at INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS broadcast_deliveries (
+            broadcast_id TEXT NOT NULL REFERENCES broadcasts(id),
+            user_id INTEGER NOT NULL REFERENCES users(user_id), status TEXT NOT NULL DEFAULT 'PENDING',
+            error TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL,
+            PRIMARY KEY(broadcast_id,user_id)
+        );
+        CREATE INDEX IF NOT EXISTS broadcast_pending ON broadcast_deliveries(broadcast_id,status,user_id);
         """)
+        user_columns = {row[1] for row in self.db.execute("PRAGMA table_info(users)")}
+        if "referred_by" not in user_columns:
+            self.db.execute("ALTER TABLE users ADD COLUMN referred_by INTEGER NOT NULL DEFAULT 0")
+        if "referred_at" not in user_columns:
+            self.db.execute("ALTER TABLE users ADD COLUMN referred_at INTEGER NOT NULL DEFAULT 0")
+        self.db.execute("CREATE INDEX IF NOT EXISTS users_referrer ON users(referred_by,created_at)")
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(orders)")}
         if "provider_cost" not in columns:
             self.db.execute("ALTER TABLE orders ADD COLUMN provider_cost TEXT NOT NULL DEFAULT '0'")
@@ -146,6 +177,69 @@ class Store:
     def balance_cents(self, user_id: int) -> int:
         row = self.db.execute("SELECT balance_cents FROM wallets WHERE user_id=?", (user_id,)).fetchone()
         return int(row[0]) if row else 0
+
+    def bind_referrer(self, user_id: int, referrer_id: int) -> bool:
+        if user_id == referrer_id:
+            raise ValueError("Você não pode usar o próprio link de afiliado.")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            user = self.db.execute(
+                "SELECT referred_by FROM users WHERE user_id=?", (user_id,)
+            ).fetchone()
+            referrer = self.db.execute(
+                "SELECT 1 FROM users WHERE user_id=?", (referrer_id,)
+            ).fetchone()
+            if not user or not referrer:
+                raise ValueError("Link de afiliado inválido.")
+            cycle = self.db.execute(
+                """WITH RECURSIVE chain(user_id,referred_by,depth) AS (
+                SELECT user_id,referred_by,0 FROM users WHERE user_id=?
+                UNION ALL SELECT u.user_id,u.referred_by,chain.depth+1 FROM users u
+                JOIN chain ON u.user_id=chain.referred_by WHERE chain.referred_by<>0 AND chain.depth<50)
+                SELECT 1 FROM chain WHERE user_id=? LIMIT 1""",
+                (referrer_id, user_id),
+            ).fetchone()
+            if cycle:
+                raise ValueError("Esta indicação criaria um vínculo inválido.")
+            if user["referred_by"]:
+                self.db.commit()
+                return int(user["referred_by"]) == referrer_id
+            if self.db.execute(
+                "SELECT 1 FROM payments WHERE user_id=? AND status IN ('PAID','REVERSED') LIMIT 1",
+                (user_id,),
+            ).fetchone():
+                raise ValueError("A indicação precisa ser registrada antes da primeira recarga.")
+            self.db.execute(
+                "UPDATE users SET referred_by=?,referred_at=? WHERE user_id=? AND referred_by=0",
+                (referrer_id, int(time.time()), user_id),
+            )
+            self.db.commit()
+            return True
+        except BaseException:
+            self.db.rollback()
+            raise
+
+    def affiliate_summary(self, user_id: int) -> dict:
+        user = self.db.execute(
+            "SELECT referred_by FROM users WHERE user_id=?", (user_id,)
+        ).fetchone()
+        earned = self.db.execute(
+            "SELECT COALESCE(sum(CASE status WHEN 'ACTIVE' THEN amount_cents ELSE 0 END),0) FROM affiliate_commissions WHERE referrer_id=?",
+            (user_id,),
+        ).fetchone()[0]
+        rows = self.db.execute(
+            """SELECT u.user_id,u.username,u.display_name,u.created_at,
+            COALESCE(sum(CASE c.status WHEN 'ACTIVE' THEN c.amount_cents ELSE 0 END),0) earned_cents
+            FROM users u LEFT JOIN affiliate_commissions c ON c.referred_user_id=u.user_id
+            WHERE u.referred_by=? GROUP BY u.user_id ORDER BY u.created_at DESC LIMIT 50""",
+            (user_id,),
+        ).fetchall()
+        return {
+            "referredBy": int(user["referred_by"]) if user else 0,
+            "invited": len(rows),
+            "earnedCents": int(earned),
+            "people": [dict(row) for row in rows],
+        }
 
     def ledger(self, user_id: int, limit: int = 10) -> list[dict]:
         return [dict(x) for x in self.db.execute(
@@ -277,11 +371,45 @@ class Store:
             if status == "paid":
                 changed = self._adjust_wallet(row["user_id"], row["amount_cents"], "DEPOSIT",
                                               f"payment:{token}", "Recarga Pix aprovada")
+                if changed:
+                    referred = self.db.execute(
+                        "SELECT referred_by FROM users WHERE user_id=?", (row["user_id"],)
+                    ).fetchone()
+                    referrer_id = int(referred["referred_by"]) if referred else 0
+                    if referrer_id:
+                        commission = int(
+                            (Decimal(row["amount_cents"]) * Decimal("0.15")).quantize(
+                                Decimal(1), rounding=ROUND_HALF_UP
+                            )
+                        )
+                        self.db.execute(
+                            """INSERT OR IGNORE INTO affiliate_commissions
+                            (payment_id,referred_user_id,referrer_id,amount_cents,status,created_at,updated_at)
+                            VALUES(?,?,?,?, 'ACTIVE',?,?)""",
+                            (token, row["user_id"], referrer_id, commission, now, now),
+                        )
+                        self._adjust_wallet(
+                            referrer_id, commission, "AFFILIATE_COMMISSION",
+                            f"affiliate:{token}", "Comissão de afiliado sobre recarga aprovada",
+                        )
                 local = "PAID"
             elif status in {"refunded", "chargedback"}:
                 if self.db.execute("SELECT 1 FROM wallet_ledger WHERE reference=?", (f"payment:{token}",)).fetchone():
                     changed = self._adjust_wallet(row["user_id"], -row["amount_cents"], "REVERSAL",
                                                   f"reversal:{token}", "Recarga estornada")
+                commission = self.db.execute(
+                    "SELECT * FROM affiliate_commissions WHERE payment_id=? AND status='ACTIVE'", (token,)
+                ).fetchone()
+                if commission:
+                    self._adjust_wallet(
+                        commission["referrer_id"], -commission["amount_cents"],
+                        "AFFILIATE_REVERSAL", f"affiliate-reversal:{token}",
+                        "Estorno de comissão de afiliado",
+                    )
+                    self.db.execute(
+                        "UPDATE affiliate_commissions SET status='REVERSED',updated_at=? WHERE payment_id=?",
+                        (now, token),
+                    )
                 local = "REVERSED"
             elif status in {"refused", "blocked", "canceled", "acquirer_error"}:
                 local = "FAILED"
@@ -477,6 +605,121 @@ class Store:
             self.db.execute("UPDATE orders SET state='UNKNOWN',error='Processo interrompido durante envio' WHERE state='SENDING'")
             self.db.execute("UPDATE actions SET state='UNKNOWN',error='Processo interrompido durante envio' WHERE state='SENDING'")
             self.db.execute("UPDATE payments SET status='UNKNOWN',error='Processo interrompido ao gerar Pix' WHERE status='CREATING'")
+            self.db.execute("UPDATE broadcast_deliveries SET status='FAILED',error='Envio interrompido',updated_at=? WHERE status='SENDING'", (int(time.time()),))
+            self.db.execute("UPDATE broadcasts SET status='QUEUED' WHERE status='RUNNING'")
+
+    def create_broadcast(self, admin_id: int, request_id: str, message: str,
+                         button_text: str, button_target: str) -> dict:
+        now, token = int(time.time()), secrets.token_hex(10)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            existing = self.db.execute(
+                "SELECT * FROM broadcasts WHERE request_id=?", (request_id,)
+            ).fetchone()
+            if existing:
+                if (existing["admin_id"], existing["message"], existing["button_text"], existing["button_target"]) != (
+                    admin_id, message, button_text, button_target
+                ):
+                    raise ValueError("Esta confirmação já foi usada com outro conteúdo.")
+                self.db.commit()
+                return dict(existing)
+            if self.db.execute(
+                "SELECT 1 FROM broadcasts WHERE status IN ('QUEUED','RUNNING') LIMIT 1"
+            ).fetchone():
+                raise ValueError("Já existe uma transmissão em andamento.")
+            self.db.execute(
+                """INSERT INTO broadcasts(id,request_id,admin_id,message,button_text,button_target,status,created_at)
+                VALUES(?,?,?,?,?,?, 'QUEUED',?)""",
+                (token, request_id, admin_id, message, button_text, button_target, now),
+            )
+            self.db.execute(
+                """INSERT INTO broadcast_deliveries(broadcast_id,user_id,updated_at)
+                SELECT ?,user_id,? FROM users""", (token, now)
+            )
+            total = self.db.execute(
+                "SELECT count(*) FROM broadcast_deliveries WHERE broadcast_id=?", (token,)
+            ).fetchone()[0]
+            self.db.execute("UPDATE broadcasts SET total=? WHERE id=?", (total, token))
+            self.db.commit()
+            return dict(self.db.execute("SELECT * FROM broadcasts WHERE id=?", (token,)).fetchone())
+        except BaseException:
+            self.db.rollback()
+            raise
+
+    def broadcasts(self, limit: int = 20) -> list[dict]:
+        return [dict(row) for row in self.db.execute(
+            "SELECT * FROM broadcasts ORDER BY created_at DESC,rowid DESC LIMIT ?", (limit,)
+        )]
+
+    def claim_broadcast_delivery(self) -> tuple[dict, int] | None:
+        now = int(time.time())
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            job = self.db.execute(
+                "SELECT * FROM broadcasts WHERE status IN ('QUEUED','RUNNING') ORDER BY created_at LIMIT 1"
+            ).fetchone()
+            if not job:
+                self.db.rollback()
+                return None
+            delivery = self.db.execute(
+                "SELECT user_id FROM broadcast_deliveries WHERE broadcast_id=? AND status='PENDING' ORDER BY user_id LIMIT 1",
+                (job["id"],),
+            ).fetchone()
+            if not delivery:
+                self.db.execute(
+                    "UPDATE broadcasts SET status='COMPLETED',finished_at=? WHERE id=?",
+                    (now, job["id"]),
+                )
+                self.db.commit()
+                return None
+            self.db.execute(
+                "UPDATE broadcasts SET status='RUNNING',started_at=CASE WHEN started_at=0 THEN ? ELSE started_at END WHERE id=?",
+                (now, job["id"]),
+            )
+            self.db.execute(
+                "UPDATE broadcast_deliveries SET status='SENDING',updated_at=? WHERE broadcast_id=? AND user_id=?",
+                (now, job["id"], delivery["user_id"]),
+            )
+            self.db.commit()
+            return dict(job), int(delivery["user_id"])
+        except BaseException:
+            self.db.rollback()
+            raise
+
+    def finish_broadcast_delivery(self, broadcast_id: str, user_id: int,
+                                  status: str, error: str = "") -> None:
+        if status not in {"SENT", "FAILED", "PENDING"}:
+            raise ValueError("Estado de transmissão inválido.")
+        with self.db:
+            self.db.execute(
+                "UPDATE broadcast_deliveries SET status=?,error=?,updated_at=? WHERE broadcast_id=? AND user_id=? AND status='SENDING'",
+                (status, error[:200], int(time.time()), broadcast_id, user_id),
+            )
+            counts = self.db.execute(
+                "SELECT sum(status='SENT'),sum(status='FAILED') FROM broadcast_deliveries WHERE broadcast_id=?",
+                (broadcast_id,),
+            ).fetchone()
+            self.db.execute(
+                "UPDATE broadcasts SET sent=?,failed=? WHERE id=?",
+                (int(counts[0] or 0), int(counts[1] or 0), broadcast_id),
+            )
+
+    def cancel_broadcast(self, token: str) -> dict:
+        now = int(time.time())
+        with self.db:
+            row = self.db.execute("SELECT * FROM broadcasts WHERE id=?", (token,)).fetchone()
+            if not row:
+                raise ValueError("Transmissão não encontrada.")
+            if row["status"] not in {"QUEUED", "RUNNING"}:
+                return dict(row)
+            self.db.execute(
+                "UPDATE broadcasts SET status='CANCELLED',finished_at=? WHERE id=?", (now, token)
+            )
+            self.db.execute(
+                "UPDATE broadcast_deliveries SET status='CANCELLED',updated_at=? WHERE broadcast_id=? AND status='PENDING'",
+                (now, token),
+            )
+        return dict(self.db.execute("SELECT * FROM broadcasts WHERE id=?", (token,)).fetchone())
 
     def admin_stats(self) -> dict:
         return {
@@ -486,4 +729,5 @@ class Store:
             "orders": self.db.execute("SELECT count(*) FROM orders WHERE state NOT IN ('DRAFT','ABORTED')").fetchone()[0],
             "unknown_orders": self.db.execute("SELECT count(*) FROM orders WHERE state='UNKNOWN'").fetchone()[0],
             "pending_payments": self.db.execute("SELECT count(*) FROM payments WHERE status IN ('PENDING','UNKNOWN')").fetchone()[0],
+            "affiliate_cents": self.db.execute("SELECT COALESCE(sum(CASE status WHEN 'ACTIVE' THEN amount_cents ELSE 0 END),0) FROM affiliate_commissions").fetchone()[0],
         }

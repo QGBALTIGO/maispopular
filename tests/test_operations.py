@@ -56,6 +56,33 @@ class OperationsTests(WebAppRouteTests):
         self.assertEqual(self.store.payment(token)["status"],"REVERSED")
         self.assertEqual(self.store.balance_cents(7),0)
 
+    async def test_affiliate_endpoint_is_private_and_uses_bot_deep_link(self):
+        self.store.bind_referrer(7, 9)
+        response = await self.client.get("/api/affiliate", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["rate"], 15)
+        self.assertTrue(response.json()["link"].endswith("?start=aff_7"))
+        self.assertEqual(
+            (await self.client.get("/api/affiliate", headers={"X-Telegram-Init-Data": signed_init(8)})).json()["invited"],
+            0,
+        )
+
+    async def test_broadcast_admin_guard_idempotency_and_recipient_snapshot(self):
+        payload = {"request_id": str(uuid4()), "message": "Novidades da loja!", "button_text": "Abrir catálogo",
+                   "button_target": "catalog", "confirmation": "CONFIRMO"}
+        denied = await self.client.post("/api/admin/broadcasts", json=payload, headers=self.headers)
+        self.assertEqual(denied.status_code, 403)
+        first = await self.client.post("/api/admin/broadcasts", json=payload, headers=self.admin_headers)
+        second = await self.client.post("/api/admin/broadcasts", json=payload, headers=self.admin_headers)
+        self.assertEqual((first.status_code, second.status_code), (200, 200))
+        self.assertEqual(first.json()["id"], second.json()["id"])
+        self.assertEqual(first.json()["total"], 2)
+        listing = await self.client.get("/api/admin/broadcasts", headers=self.admin_headers)
+        self.assertEqual(listing.json()["audience"], 2)
+        invalid = await self.client.post("/api/admin/broadcasts", json={**payload, "request_id": str(uuid4()),
+                                         "button_text": "", "button_target": "catalog"}, headers=self.admin_headers)
+        self.assertEqual(invalid.status_code, 400)
+
     async def test_unknown_payment_resumes_same_provider_key(self):
         self.cakto.create_pix.side_effect = PaymentUnavailable("timeout")
         response = await self.client.post("/api/payments",json=self.customer,headers=self.headers)

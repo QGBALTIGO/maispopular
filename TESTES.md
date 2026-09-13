@@ -12,6 +12,8 @@ python -m unittest discover -s tests -v
 A suíte cobre cálculo 2×, arredondamento em centavos, filtro e agrupamento do catálogo,
 validação de CPF/telefone/e-mail, recarga mínima, idempotência de crédito e estorno,
 débito único da carteira, devolução em rejeição, duplo clique e contrato HTTP da Cakto.
+Também cobre vínculo e comissão de afiliado, estorno de comissão, proteção contra ciclos,
+autorização/idempotência do broadcast, cancelamento e worker persistente de envio.
 
 ## Verificações ao implantar
 

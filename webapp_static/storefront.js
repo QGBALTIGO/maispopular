@@ -76,7 +76,10 @@
         });
       }
     });
-    reloadBanners();
+    if (state.bootstrap?.banners) {
+      applyBanners(state.bootstrap.banners);
+      renderBanners();
+    } else reloadBanners();
     $("heroPause").addEventListener("click", () => pause(!paused));
     motion.addEventListener("change", (event) => {
       if (event.matches) pause(true);
@@ -100,6 +103,16 @@
       },
       { passive: true },
     );
+  }
+  function applyBanners(items) {
+    slides = items.map((b) => [
+      b.url,
+      b.title,
+      "",
+      b.destination,
+      b.fit,
+      b.position,
+    ]);
   }
   function renderBanners() {
     $("heroSlides").replaceChildren();
@@ -153,14 +166,7 @@
   async function reloadBanners() {
     try {
       const data = await api("/api/banners");
-      slides = data.banners.map((b) => [
-        b.url,
-        b.title,
-        "",
-        b.destination,
-        b.fit,
-        b.position,
-      ]);
+      applyBanners(data.banners);
     } catch (error) {
       toast(
         "Não foi possível atualizar os banners. Exibindo a última versão disponível.",

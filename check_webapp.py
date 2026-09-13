@@ -44,6 +44,8 @@ def main() -> None:
         catalog.raise_for_status()
         account = client.get("/api/account", headers=headers)
         account.raise_for_status()
+        affiliate = client.get("/api/affiliate", headers=headers)
+        affiliate.raise_for_status()
         orders = client.get("/api/orders", headers=headers)
         orders.raise_for_status()
         payments = client.get("/api/payments", headers=headers)
@@ -54,6 +56,8 @@ def main() -> None:
         queue.raise_for_status()
         prices = client.get("/api/admin/prices",headers=headers)
         prices.raise_for_status()
+        broadcasts = client.get("/api/admin/broadcasts",headers=headers)
+        broadcasts.raise_for_status()
         reviews = client.get("/api/reviews",headers=headers)
         reviews.raise_for_status()
         search = client.get("/api/search",params={"q":"Instagram"},headers=headers)
@@ -84,6 +88,8 @@ def main() -> None:
         assert 'id="welcomeText"' not in page.text
         assert 'id="manageBanners"' in page.text
         assert 'id="manageProductBanners"' in page.text
+        assert 'id="manageBroadcasts"' in page.text
+        assert 'id="affiliateEntry"' in page.text
         product_banners=client.get('/api/admin/product-banners',headers=headers)
         product_banners.raise_for_status()
         assert product_banners.json()['services']
@@ -93,7 +99,12 @@ def main() -> None:
         banners=client.get('/api/banners',headers=headers)
         banners.raise_for_status()
         assert len(banners.json()['banners'])==3
-        for banner in banners.json()['banners']:client.get(banner['url']).raise_for_status()
+        for banner in banners.json()['banners']:
+            media = client.get(banner['url'])
+            media.raise_for_status()
+            if banner['custom']:
+                assert 'immutable' in media.headers.get('cache-control','')
+        assert affiliate.json()['rate'] == 15 and affiliate.json()['link'].startswith('https://t.me/')
         assert 'id="managePrices"' in page.text
         assert 'href="https://baltigoflix.com.br"' in page.text
         assert 'id="themeToggle"' in page.text
@@ -111,7 +122,8 @@ def main() -> None:
                       "payments": payments.status_code, "admin": admin.status_code,
                       "depositAmounts": catalog.json()["depositOptions"],
                       "subscriptions": len(names), "fulfillment": queue.status_code,
-                      "prices":prices.status_code,"reviews":reviews.status_code,"reviewCount":reviews.json()["count"],
+                      "prices":prices.status_code,"broadcasts":broadcasts.status_code,"affiliate":affiliate.status_code,
+                      "reviews":reviews.status_code,"reviewCount":reviews.json()["count"],
                       "search":search.status_code,"assets": "ok"}, ensure_ascii=False))
 
 

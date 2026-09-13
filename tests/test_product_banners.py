@@ -43,8 +43,10 @@ class ProductBannerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(item["revision"], 1)
         self.assertTrue(item["custom"])
         media = await self.client.get(item["url"])
-        self.assertEqual(media.content, base64.b64decode(payload["image"]))
-        self.assertEqual(media.headers["content-type"], "image/png")
+        self.assertEqual(media.headers["content-type"], "image/webp")
+        self.assertIn("immutable", media.headers["cache-control"])
+        with Image.open(BytesIO(media.content)) as rendered:
+            self.assertEqual(rendered.format, "WEBP")
         catalog = (
             await self.client.get(
                 "/api/catalog?platform=Instagram", headers=self.headers
@@ -190,7 +192,7 @@ class ProductBannerTests(unittest.IsolatedAsyncioTestCase):
         ).json()
         self.assertFalse(catalog["services"][0]["banner"]["custom"])
         media = await self.client.get(artwork["url"])
-        self.assertEqual(media.headers["content-type"], "image/png")
+        self.assertEqual(media.headers["content-type"], "image/webp")
         stale = await self.client.post(
             "/api/admin/platform-banners", headers=self.headers, json=platform_payload
         )

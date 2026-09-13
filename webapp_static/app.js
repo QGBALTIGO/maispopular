@@ -1,6 +1,6 @@
 "use strict";
 const tg = window.Telegram?.WebApp;
-const initData = tg?.initData || "";
+const initData = tg?.initData || window.__MAISPOPULAR_PREVIEW_INIT || "";
 const state = {
   bootstrap: null,
   catalog: null,
@@ -200,7 +200,7 @@ function show(id) {
     .forEach((el) => el.classList.toggle("hidden", el.id !== id));
   const active = ["families", "services", "order", "success"].includes(id)
     ? "platforms"
-    : ["deposit", "payment", "admin"].includes(id)
+    : ["deposit", "payment", "admin", "affiliate", "broadcastAdmin", "bannersAdmin", "productBannersAdmin", "prices"].includes(id)
       ? "wallet"
       : id === "orderDetail"
         ? "orders"
@@ -232,6 +232,8 @@ function goBack() {
       deposit: "wallet",
       payment: "wallet",
       admin: "wallet",
+      affiliate: "wallet",
+      broadcastAdmin: "admin",
       orderDetail: "orders",
     }[state.view] || "platforms",
   );
@@ -826,6 +828,7 @@ function navigate(id) {
   if (!state.bootstrap) return;
   if (id === "wallet") loadWallet();
   else if (id === "orders") loadOrders();
+  else if (id === "affiliate") loadAffiliate();
   else show(id);
 }
 async function boot() {
@@ -841,7 +844,8 @@ async function boot() {
     $("bottomNav").classList.remove("hidden");
     window.storeOperations?.boot();
     window.storefront?.boot();
-    const requested = new URLSearchParams(location.search).get("platform");
+    const params = new URLSearchParams(location.search);
+    const requested = params.get("platform");
     if (
       requested &&
       state.bootstrap.platforms.some((p) => p.name === requested)

@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock
 
 import uvicorn
+from fastapi.responses import HTMLResponse, Response
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -36,7 +37,7 @@ async def catalog():
 
 if __name__ == "__main__":
     services = asyncio.run(catalog())
-    with TemporaryDirectory(prefix="maispopular-preview-") as folder:
+    with TemporaryDirectory(prefix="maispopular-preview-", ignore_cleanup_errors=True) as folder:
         path = Path(folder) / "preview.sqlite3"
         store = Store(path)
         provider = AsyncMock(spec=ServiceProvider)
@@ -64,7 +65,24 @@ if __name__ == "__main__":
         store.claim_order(fixture_order['id'],7)
         store.mark_order(fixture_order['id'],'COMPLETED')
         app = create_app(panel)
+        @app.get("/preview")
+        async def preview_page():
+            html = (ROOT / "webapp_static" / "index.html").read_text(encoding="utf-8")
+            return HTMLResponse(html.replace(
+                '<script src="https://telegram.org/js/telegram-web-app.js?63"></script>',
+                '<script src="/preview-auth.js"></script>',
+            ))
+
+        @app.get("/preview-auth.js")
+        async def preview_auth():
+            return Response(
+                'window.__MAISPOPULAR_PREVIEW_INIT=new URLSearchParams(location.search).get("init")||"";',
+                media_type="application/javascript",
+            )
         print("Preview uses test auth and isolated wallet; no live orders.", flush=True)
         # Publicly-known test token, not a production credential.
         print("TEST_INIT=" + signed_init(), flush=True)
-        uvicorn.run(app, host="127.0.0.1", port=8039, log_level="warning")
+        try:
+            uvicorn.run(app, host="127.0.0.1", port=8039, log_level="warning")
+        finally:
+            store.close()

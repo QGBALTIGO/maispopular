@@ -133,6 +133,53 @@ span[data-icon] {
 .full-button {
   width: 100%;
 }
+.affiliate-entry {
+  margin: 14px 0 26px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  color: white;
+  background: linear-gradient(135deg, #075fdb, #14a3ff);
+  border: 0;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px #0878e52b;
+}
+.affiliate-entry > span:first-child { width: 34px; height: 34px; }
+.affiliate-entry > span:nth-child(2) { flex: 1; }
+.affiliate-entry strong, .affiliate-entry small { display: block; }
+.affiliate-entry small { margin-top: 4px; color: #e7f4ff; line-height: 1.35; }
+.affiliate-entry b { font-size: 20px; }
+.affiliate-hero {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 22px;
+}
+.affiliate-hero > div, .broadcast-audience {
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--paper);
+}
+.affiliate-hero small, .broadcast-audience small { display: block; color: var(--muted); }
+.affiliate-hero strong, .broadcast-audience strong { display: block; margin-top: 8px; font-size: 21px; }
+.affiliate-rules { margin-top: 16px; }
+.broadcast-audience { display: flex; align-items: center; gap: 13px; margin: 16px 0 24px; }
+.broadcast-audience > span { width: 34px; height: 34px; color: var(--blue); }
+.broadcast-preview {
+  margin: 8px 0 20px;
+  padding: 15px;
+  border: 1px solid #b7d3ff;
+  border-radius: 16px 16px 16px 5px;
+  background: var(--blue-soft);
+}
+.broadcast-preview > small { color: var(--blue); font-weight: 750; letter-spacing: .08em; }
+.broadcast-preview p { white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0; line-height: 1.55; }
+.broadcast-preview > span { display: block; padding: 10px; border-radius: 9px; text-align: center; color: white; background: var(--blue); font-weight: 700; }
+.broadcast-job progress { width: 100%; height: 9px; accent-color: var(--blue); }
+.broadcast-excerpt { white-space: pre-wrap; max-height: 6.2em; overflow: hidden; overflow-wrap: anywhere; }
 .pix-card {
   padding: 22px;
   background: var(--paper);

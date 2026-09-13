@@ -74,6 +74,15 @@ class ReviewInput(BaseModel):
     consent: Literal[True]
 
 
+class BroadcastInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    request_id: UUID
+    message: str = Field(min_length=1, max_length=3500)
+    button_text: str = Field(default="", max_length=40)
+    button_target: Literal["none", "catalog", "orders", "wallet", "support", "baltigoflix"] = "none"
+    confirmation: Literal["CONFIRMO"]
+
+
 def install_operations(app, panel, authenticated):
     import banners
 
@@ -100,7 +109,7 @@ def install_operations(app, panel, authenticated):
         return Response(
             content=row["image"],
             media_type=row["mime"],
-            headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"},
+            headers={"Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"},
         )
 
     @app.post("/api/admin/banners/{slot}")
@@ -160,7 +169,7 @@ def install_operations(app, panel, authenticated):
         return Response(
             content=row["image"],
             media_type=row["mime"],
-            headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"},
+            headers={"Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"},
         )
 
     @app.post("/api/admin/platform-banners")
@@ -200,7 +209,7 @@ def install_operations(app, panel, authenticated):
         return Response(
             content=row["image"],
             media_type=row["mime"],
-            headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"},
+            headers={"Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff"},
         )
 
     @app.post("/api/admin/product-banners/{service_id}")
@@ -292,6 +301,20 @@ def install_operations(app, panel, authenticated):
             (uid,),
         )
         return {"payments": [payment_json(dict(row), False) for row in rows]}
+
+    @app.get("/api/affiliate")
+    async def affiliate(init_data: Auth):
+        uid = user_id(init_data)
+        data = panel.store.affiliate_summary(uid)
+        data.update(
+            rate=15,
+            link=f"https://t.me/{panel.settings.bot_username}?start=aff_{uid}",
+            earnedLabel=money_brl(Decimal(data["earnedCents"]) / 100),
+        )
+        for person in data["people"]:
+            person["earnedLabel"] = money_brl(Decimal(person["earned_cents"]) / 100)
+            person.pop("earned_cents", None)
+        return data
 
     @app.post("/api/payments")
     async def create_payment(payload: PaymentInput, init_data: Auth):
@@ -465,6 +488,41 @@ def install_operations(app, panel, authenticated):
             "unknownOrders": [dict(r) for r in unknown],
             "credits": [dict(r) for r in credits],
         }
+
+    def broadcast_json(row):
+        return {
+            "id": row["id"], "status": row["status"], "message": row["message"],
+            "buttonText": row["button_text"], "buttonTarget": row["button_target"],
+            "total": row["total"], "sent": row["sent"], "failed": row["failed"],
+            "createdAt": row["created_at"], "startedAt": row["started_at"],
+            "finishedAt": row["finished_at"], "adminId": row["admin_id"],
+        }
+
+    @app.get("/api/admin/broadcasts")
+    async def broadcast_list(init_data: Auth):
+        admin(init_data)
+        return {
+            "audience": panel.store.db.execute("SELECT count(*) FROM users").fetchone()[0],
+            "broadcasts": [broadcast_json(row) for row in panel.store.broadcasts()],
+        }
+
+    @app.post("/api/admin/broadcasts")
+    async def create_broadcast(payload: BroadcastInput, init_data: Auth):
+        actor = admin(init_data)
+        if bool(payload.button_text) != (payload.button_target != "none"):
+            raise ValueError("Informe o texto e o destino do botão, ou deixe ambos vazios.")
+        row = panel.store.create_broadcast(
+            actor, str(payload.request_id), payload.message,
+            payload.button_text, payload.button_target,
+        )
+        return broadcast_json(row)
+
+    @app.post("/api/admin/broadcasts/{token}/cancel")
+    async def cancel_broadcast(token: str, init_data: Auth):
+        admin(init_data)
+        if len(token) != 20 or any(c not in "0123456789abcdef" for c in token):
+            raise HTTPException(404, "Transmissão não encontrada.")
+        return broadcast_json(panel.store.cancel_broadcast(token))
 
     @app.get("/api/admin/users")
     async def admin_users(

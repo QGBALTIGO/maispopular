@@ -51,6 +51,7 @@ from ui_checkout import begin_order
 from ui_common import LOG, SecretFilter, btn, e, guard, panel, say, uid, web_btn
 from ui_orders import action_preview, action_result, order_page, order_text, orders_page
 from ui_payments import choose_deposit, deposit_menu, payment_page
+from broadcasts import poll_broadcasts
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -325,7 +326,7 @@ async def post_init(app: Application) -> None:
                            for amount, offer_id in p.settings.cakto_offers.items()))
     await app.bot.set_my_commands([
         BotCommand("start", "Abrir a loja"), BotCommand("pedidos", "Meus pedidos"),
-        BotCommand("ajuda", "Suporte"),
+        BotCommand("afiliados", "Indique e ganhe"), BotCommand("ajuda", "Suporte"),
     ])
     await sync_webapp_button(app)
     try:
@@ -375,7 +376,7 @@ def build_app(p: Panel) -> Application:
         ("saldo", ui_entry.command), ("recarga", ui_entry.command), ("pedidos", ui_entry.command),
         ("pedido", ui_entry.command), ("cancelar", home), ("meuid", identity),
         ("ajuda", ui_entry.command), ("admin", ui_entry.command), ("resolver", ui_entry.command),
-        ("darsaldo", ui_entry.grant_credit),
+        ("afiliados", ui_entry.command), ("darsaldo", ui_entry.grant_credit),
     ]:
         app.add_handler(CommandHandler(command, handler))
     app.add_handler(CallbackQueryHandler(ui_entry.callback))
@@ -390,6 +391,8 @@ def build_app(p: Panel) -> Application:
     app.job_queue.run_repeating(poll_webapp_button, interval=15, first=5,
                                 job_kwargs={"max_instances": 1, "coalesce": True})
     app.job_queue.run_repeating(poll_fulfillment, interval=30, first=12,
+                                job_kwargs={"max_instances": 1, "coalesce": True})
+    app.job_queue.run_repeating(poll_broadcasts, interval=2, first=3,
                                 job_kwargs={"max_instances": 1, "coalesce": True})
     return app
 

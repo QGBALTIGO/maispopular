@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#f7f8fa" />
     <title>Mais Popular • Sua loja digital</title>
     <link rel="icon" href="/assets/logo.jpg" />
-    <link rel="stylesheet" href="/assets/app.css?v=6" />
+    <link rel="stylesheet" href="/assets/app.css?v=7" />
     <link rel="stylesheet" href="/assets/storefront.css?v=6" />
     <link rel="stylesheet" href="/assets/experience.css?v=9" />
     <link rel="stylesheet" href="/assets/blue-store.css?v=10" />
@@ -314,6 +314,9 @@
               <span data-icon="plus"></span>Adicionar saldo com Pix</button
             ><small>Recarga a partir de R$ 20 · Pague com Pix</small>
           </div>
+          <button id="affiliateEntry" class="affiliate-entry full-button">
+            <span data-icon="users"></span><span><strong>Indique e ganhe 15%</strong><small>Receba bônus em toda recarga dos seus indicados.</small></span><b>→</b>
+          </button>
           <div class="section-heading">
             <h2>Últimas movimentações</h2>
             <span class="muted">Até 30 registros</span>
@@ -324,6 +327,24 @@
             <button id="refreshPayments" class="text-button">Atualizar</button>
           </div>
           <div id="paymentList" class="service-list"></div>
+        </section>
+        <section id="affiliate" class="view hidden">
+          <button class="back" data-back="wallet">← Carteira</button>
+          <div class="page-intro compact">
+            <p class="greeting">Programa de afiliados</p>
+            <h1>Indique e ganhe 15%</h1>
+            <p>Compartilhe seu link. Quando o indicado fizer uma recarga aprovada, o bônus entra automaticamente no seu saldo.</p>
+          </div>
+          <div class="affiliate-hero">
+            <div><small>Total recebido</small><strong id="affiliateEarned">—</strong></div>
+            <div><small>Pessoas indicadas</small><strong id="affiliateInvited">—</strong></div>
+          </div>
+          <label class="field"><span>Seu link exclusivo</span><input id="affiliateLink" readonly /></label>
+          <button id="copyAffiliate" class="primary-button full-button">Copiar link de indicação</button>
+          <p class="intro-copy affiliate-rules">O vínculo é feito na primeira entrada pelo seu link e não pode ser trocado. Autoindicação não é permitida. Comissões de pagamentos estornados também são estornadas.</p>
+          <h2 class="section-title">Seus indicados</h2>
+          <div id="affiliatePeople" class="activity-list"></div>
+          <p id="affiliateError" class="field-error" role="alert"></p>
         </section>
         <section id="deposit" class="view hidden">
           <button class="back" data-back="wallet">← Carteira</button>
@@ -460,6 +481,9 @@
           <button id="manageBanners" class="secondary-button full-button">
             Gerenciar banners da loja
           </button>
+          <button id="manageBroadcasts" class="secondary-button full-button">
+            Transmitir mensagem aos clientes
+          </button>
           <h2 class="section-title">Fila de entrega</h2>
           <p class="intro-copy">
             Pedidos pagos em processamento. Assumir a entrega manual bloqueia o
@@ -514,6 +538,27 @@
           <h2 class="section-title">Últimos créditos administrativos</h2>
           <div id="adminCredits" class="activity-list"></div>
           <p id="adminError" class="field-error" role="alert"></p>
+        </section>
+        <section id="broadcastAdmin" class="view hidden">
+          <button id="backBroadcastAdmin" class="back">← Administração</button>
+          <div class="page-intro compact">
+            <p class="eyebrow">COMUNICAÇÃO COM CLIENTES</p>
+            <h1>Transmissões</h1>
+            <p>Escreva, confira a prévia e envie com acompanhamento em tempo real.</p>
+          </div>
+          <div class="broadcast-audience"><span data-icon="users"></span><div><small>Público atual</small><strong id="broadcastAudience">—</strong></div></div>
+          <form id="broadcastForm">
+            <label class="field"><span>Mensagem</span><textarea id="broadcastMessage" minlength="1" maxlength="3500" placeholder="Digite a mensagem que os clientes receberão" required></textarea><small id="broadcastCount">0 / 3500</small></label>
+            <div class="form-columns">
+              <label class="field"><span>Texto do botão (opcional)</span><input id="broadcastButtonText" maxlength="40" placeholder="Abrir catálogo" /></label>
+              <label class="field"><span>Destino do botão</span><select id="broadcastButtonTarget"><option value="none">Sem botão</option><option value="catalog">Catálogo</option><option value="orders">Meus pedidos</option><option value="wallet">Carteira</option><option value="support">Suporte</option><option value="baltigoflix">BaltigoFlix</option></select></label>
+            </div>
+            <div class="broadcast-preview"><small>PRÉVIA DA MENSAGEM</small><p id="broadcastPreview">Sua mensagem aparecerá aqui.</p><span id="broadcastPreviewButton" class="hidden"></span></div>
+            <p id="broadcastError" class="field-error" role="alert"></p>
+            <button id="broadcastSubmit" class="primary-button full-button" type="submit">Revisar e transmitir</button>
+          </form>
+          <div class="section-heading"><h2>Histórico</h2><button id="refreshBroadcasts" class="text-button">Atualizar</button></div>
+          <div id="broadcastList" class="service-list"></div>
         </section>
         <section id="productBannersAdmin" class="view hidden">
           <button id="backProductBanners" class="back">← Administração</button>
@@ -883,6 +928,7 @@
         <button data-shop-nav="platforms">Catálogo <span>→</span></button
         ><button data-shop-nav="orders">Meus pedidos <span>→</span></button
         ><button data-shop-nav="wallet">Minha carteira <span>→</span></button
+        ><button data-shop-nav="affiliate">Indique e ganhe 15% <span>→</span></button
         ><button data-shop-nav="help">Ajuda e suporte <span>→</span></button
         ><button id="menuAdmin" class="hidden">
           Administração <span>→</span></button
@@ -995,12 +1041,14 @@
         </button>
       </form>
     </dialog>
-    <script src="/assets/app.js?v=14" defer></script>
-    <script src="/assets/operations.js?v=11" defer></script>
-    <script src="/assets/storefront.js?v=13" defer></script>
+    <script src="/assets/app.js?v=15" defer></script>
+    <script src="/assets/operations.js?v=12" defer></script>
+    <script src="/assets/storefront.js?v=14" defer></script>
     <script src="/assets/prices.js?v=9" defer></script>
-    <script src="/assets/blue-store.js?v=11" defer></script>
+    <script src="/assets/blue-store.js?v=12" defer></script>
     <script src="/assets/banners-admin.js?v=11" defer></script>
     <script src="/assets/product-banners-admin.js?v=15" defer></script>
+    <script src="/assets/affiliate.js?v=1" defer></script>
+    <script src="/assets/broadcast-admin.js?v=1" defer></script>
   </body>
 </html>

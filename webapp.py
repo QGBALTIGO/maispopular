@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 import platform_banners
 import product_banners
+import banners
 from catalog_copy import display_name, presentation
 from config import Settings
 from domain import family_sort_key, money_brl, platform_sort_key
@@ -277,6 +278,7 @@ def create_app(panel: Panel, *, own_resources: bool = False) -> FastAPI:
             ],
             "isAdmin": panel.is_admin(int(user["id"])),
             "botUrl": f"https://t.me/{panel.settings.bot_username}",
+            "banners": banners.listing(panel.store),
         }
 
     @app.get("/api/catalog")
@@ -350,6 +352,8 @@ def create_app(panel: Panel, *, own_resources: bool = False) -> FastAPI:
                         "ORDER": "Compra de serviço",
                         "ORDER_REFUND": "Reembolso de pedido",
                         "REVERSAL": "Estorno de recarga",
+                        "AFFILIATE_COMMISSION": "Bônus de afiliado",
+                        "AFFILIATE_REVERSAL": "Estorno de bônus de afiliado",
                     }.get(
                         row["kind"].upper(),
                         "Crédito na carteira"
