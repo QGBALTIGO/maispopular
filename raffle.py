@@ -6,7 +6,13 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions, Update
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    LinkPreviewOptions,
+    Update,
+    WebAppInfo,
+)
 from telegram.error import Forbidden, RetryAfter, TelegramError
 from telegram.ext import ContextTypes
 
@@ -41,7 +47,11 @@ def _join_keyboard(include_verify: bool = True) -> InlineKeyboardMarkup:
             for name, username in REQUIRED_CHANNELS[index:index + 2]
         ])
     if include_verify:
-        rows.append([InlineKeyboardButton("✅ Já entrei — gerar cartela", callback_data="raffle:verify")])
+        rows.append([
+            InlineKeyboardButton(
+                "✅ Confirmar participação", callback_data="raffle:verify"
+            )
+        ])
     return InlineKeyboardMarkup(rows)
 
 
@@ -71,6 +81,14 @@ def _cards_text(cards: list[dict]) -> str:
     )
 
 
+def _missing_channels_text(missing: list[str]) -> str:
+    usernames = {name: username for name, username in REQUIRED_CHANNELS}
+    return "\n".join(
+        f"▫️ <a href=\"https://t.me/{usernames[name][1:]}\">{html.escape(name)}</a>"
+        for name in missing
+    )
+
+
 async def _show_status(update: Update, context: ContextTypes.DEFAULT_TYPE,
                        *, verify: bool = False) -> None:
     store = panel(context).store
@@ -95,12 +113,15 @@ async def _show_status(update: Update, context: ContextTypes.DEFAULT_TYPE,
                 except TelegramError:
                     LOG.info("Bônus de indicação registrado; aviso privado indisponível.")
         else:
-            names = "\n".join(f"• {html.escape(name)}" for name in missing)
             await update.effective_message.reply_text(
-                "🔒 <b>Falta concluir sua entrada</b>\n\nEntre nos canais abaixo e toque novamente em <b>Já entrei</b>.\n\n"
-                f"Ainda não confirmado:\n{names}",
+                "🎲 <b>SUA CARTELA ESTÁ QUASE PRONTA</b>\n\n"
+                "Para validar sua participação, falta entrar nos canais abaixo:\n\n"
+                f"{_missing_channels_text(missing)}\n\n"
+                "Depois de entrar, toque em <b>Confirmar participação</b>. "
+                "Se estiver tudo certo, seus seis números aparecem na hora.",
                 parse_mode="HTML",
                 reply_markup=_join_keyboard(),
+                link_preview_options=LinkPreviewOptions(is_disabled=True),
             )
             return
     data = store.raffle_summary(user_id, CAMPAIGN_ID)
@@ -122,6 +143,14 @@ async def _show_status(update: Update, context: ContextTypes.DEFAULT_TYPE,
         "https://t.me/share/url?url=" + share
         + "&text=Participe%20do%20Sorteio%20Mais%20Popular%20comigo!"
     )
+    action_row = [InlineKeyboardButton("📨 Convidar amigos", url=share_url)]
+    webapp_url = panel(context).settings.webapp_url()
+    if webapp_url:
+        action_row.append(
+            InlineKeyboardButton(
+                "🛒 Abrir catálogo", web_app=WebAppInfo(url=webapp_url)
+            )
+        )
     await update.effective_message.reply_text(
         "🎟 <b>SUAS CARTELAS ESTÃO CONFIRMADAS</b>\n\n"
         f"{_cards_text(data['cards'])}\n\n"
@@ -132,8 +161,8 @@ async def _show_status(update: Update, context: ContextTypes.DEFAULT_TYPE,
         f"🗓 {schedule_label(campaign['scheduled_at'])} · resultado no @MaisPopular",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📨 Convidar amigos", url=share_url)],
-            [InlineKeyboardButton("🔄 Conferir canais e cartelas", callback_data="raffle:verify")],
+            action_row,
+            [InlineKeyboardButton("🔄 Atualizar participação", callback_data="raffle:verify")],
         ]),
         link_preview_options=LinkPreviewOptions(is_disabled=True),
     )

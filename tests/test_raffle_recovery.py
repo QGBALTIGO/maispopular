@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
-from raffle import _run_draw
+from raffle import _join_keyboard, _missing_channels_text, _run_draw, _show_status
 from recovery import poll_recovery
 from storage import Store
 
@@ -200,3 +200,24 @@ class RaffleDrawTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(winners), 5)
         self.assertEqual(len({row["user_id"] for row in winners}), 5)
         self.assertEqual(self.store.raffle_campaign("set26")["status"], "COMPLETED")
+
+    async def test_participant_panel_has_invite_catalog_and_clean_channel_links(self):
+        panel = self.context.application.bot_data["panel"]
+        panel.settings = SimpleNamespace(
+            admin_ids=frozenset(),
+            bot_username="MaisPopularBot",
+            webapp_url=lambda: "https://shop.example",
+        )
+        update = SimpleNamespace(
+            effective_user=SimpleNamespace(id=1),
+            effective_message=SimpleNamespace(reply_text=AsyncMock()),
+            callback_query=None,
+        )
+        await _show_status(update, self.context)
+        markup = update.effective_message.reply_text.await_args.kwargs["reply_markup"]
+        self.assertEqual([button.text for button in markup.inline_keyboard[0]], ["📨 Convidar amigos", "🛒 Abrir catálogo"])
+        self.assertEqual(markup.inline_keyboard[0][1].web_app.url, "https://shop.example")
+        missing = _missing_channels_text(["Central de Animes", "Mais Popular"])
+        self.assertIn("https://t.me/centraldeanimes_baltigo", missing)
+        self.assertIn("https://t.me/MaisPopular", missing)
+        self.assertEqual(_join_keyboard().inline_keyboard[-1][0].text, "✅ Confirmar participação")
