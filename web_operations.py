@@ -9,6 +9,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 import qrcode
+import reviews
 from fastapi import Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -49,6 +50,24 @@ class FulfillmentInput(BaseModel):
     operation: Literal["claim", "release", "complete", "refund"]
     note: str = Field(min_length=5, max_length=300)
     confirmation: Literal["CONFIRMO"]
+
+
+class PriceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid",str_strip_whitespace=True)
+    operation: Literal["unit","reset","multiplier"]
+    service_id: int | None = Field(default=None,gt=0)
+    value: str = Field(default="",max_length=20)
+    reason: str = Field(min_length=5,max_length=200)
+    revision: int = Field(ge=0)
+    confirmation: Literal["CONFIRMO"]
+
+
+class ReviewInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    name: str = Field(min_length=2,max_length=40,pattern=r"^[\wÀ-ÿ .-]+$")
+    rating: int = Field(strict=True,ge=1,le=5)
+    comment: str = Field(min_length=10,max_length=600)
+    consent: Literal[True]
 
 
 def install_operations(app, panel, authenticated):
@@ -156,8 +175,37 @@ def install_operations(app, panel, authenticated):
                 "target": row["target"], "createdAt": row["created_at"],
                 "startCount": str(status.get("start_count", "—"))[:50],
                 "remains": str(status.get("remains", "—"))[:50], **supported,
+                **reviews.eligibility(panel.store,token,uid),
                 "actions": [{"id": a["id"], "kind": a["kind"], "state": a["state"],
                              "hasRefill": bool(json.loads(a["result_json"]).get("refill"))} for a in actions]}
+
+    @app.get("/api/reviews")
+    async def customer_reviews(init_data: Auth, page: int = Query(default=0,ge=0,le=10000)):
+        user_id(init_data)
+        return reviews.listing(panel.store,page)
+
+    @app.get("/api/search")
+    async def search_catalog(init_data: Auth, q: str = Query(min_length=2,max_length=80)):
+        from webapp import service_json
+        user_id(init_data)
+        term = q.strip().casefold()
+        if len(term)<2:
+            return {"services":[],"hasMore":False}
+        items = []
+        for service in await panel.catalog():
+            item = service_json(service,panel.settings.price_multiplier,panel.retail_rate(service))
+            if all(word in f"{item['displayName']} {service.platform} {service.id} {service.family}".casefold() for word in term.split()):
+                items.append(item)
+                if len(items)>30:
+                    break
+        return {"services":items[:30],"hasMore":len(items)>30}
+
+    @app.post("/api/orders/{token}/review")
+    async def review_order(token: str, payload: ReviewInput, init_data: Auth):
+        uid = user_id(init_data)
+        if not panel.store.order(token,uid):
+            raise HTTPException(404,"Pedido não encontrado.")
+        return reviews.create(panel.store,token,uid,payload.name,payload.rating,payload.comment)
 
     @app.post("/api/orders/{token}/refresh")
     async def refresh_order(token: str, init_data: Auth):
@@ -220,6 +268,32 @@ def install_operations(app, panel, authenticated):
             ORDER BY created_at LIMIT 100""")
         audit = panel.store.db.execute("SELECT * FROM fulfillment_audit ORDER BY id DESC LIMIT 30")
         return {"orders": [dict(r) for r in rows], "audit": [dict(r) for r in audit]}
+
+    @app.get("/api/admin/prices")
+    async def prices(init_data: Auth):
+        import pricing
+        from catalog_copy import presentation
+        admin(init_data)
+        services = await panel.catalog()
+        policy = panel.store.db.execute("SELECT * FROM pricing_policy WHERE id=1").fetchone()
+        items = []
+        for service in services:
+            price, _, custom = pricing.rate(panel,service)
+            divisor = 1 if service.kind.casefold()=="package" else 1000
+            items.append({"id":service.id,"name":presentation(service)["displayName"],"platform":service.platform,
+                          "kind":service.kind.casefold(),"unitPrice":format(price/divisor,"f"),
+                          "unitLabel":pricing.unit_label(price/divisor),"costUnit":format(service.rate/divisor,"f"),"custom":custom})
+        return {"revision":policy["revision"],"multiplier":policy["multiplier"] or str(panel.settings.price_multiplier),
+                "services":items,"audit":[dict(row) for row in panel.store.db.execute("SELECT * FROM pricing_audit ORDER BY id DESC LIMIT 30")]}
+
+    @app.post("/api/admin/prices")
+    async def edit_price(payload: PriceInput, init_data: Auth):
+        import pricing
+        actor = admin(init_data)
+        if payload.operation == "multiplier" and payload.service_id is not None:
+            raise ValueError("A regra geral não aceita ID de serviço.")
+        service = await panel.service(payload.service_id,force=True) if payload.service_id else None
+        return pricing.change(panel,actor,payload.operation,payload.value,payload.reason,payload.revision,service)
 
     @app.post("/api/admin/fulfillment/{token}")
     async def manual_fulfillment(token: str, payload: FulfillmentInput, init_data: Auth):

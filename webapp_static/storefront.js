@@ -7,13 +7,13 @@
   let paused = motion.matches;
   const slides = [
     [
-      "social.png",
+      "social-blue-v2.png",
       "Impulsione suas redes sociais",
       "Seguidores, curtidas e visualizações. Explore os serviços.",
       "#socialSection",
     ],
     [
-      "services.png",
+      "streaming-blue-v2.png",
       "Mais opções para o seu dia",
       "Assinaturas, ferramentas e serviços digitais em um só lugar.",
       "#streamingSection",
@@ -209,13 +209,13 @@
         body.append(
           element("h3", "", service.displayName),
           element("p", "", service.summary),
-          element("strong", "product-price", service.rateLabel),
+          element("strong", "product-price", service.unitPriceLabel),
           element(
             "small",
             "",
             service.kind === "package"
               ? "por assinatura / pacote"
-              : "a cada 1.000 unidades",
+              : `por unidade · mín. ${number(service.minimum)}`,
           ),
           element("span", "product-cta", "Ver detalhes →"),
         );
@@ -242,11 +242,14 @@
     }
   }
   window.storefront = {
+    refresh: products,
     boot() {
       if (booted) return;
       booted = true;
       carousel();
       products();
+      window.customerReviews?.load();
+      window.blueStore?.boot();
     },
   };
   if (state.bootstrap) window.storefront.boot();

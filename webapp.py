@@ -86,8 +86,10 @@ class QuoteInput(BaseModel):
     answer: str | None = Field(default=None, max_length=6)
 
 
-def service_json(item, multiplier: Decimal) -> dict:
-    raw_retail_rate = item.rate * multiplier
+def service_json(item, multiplier: Decimal, retail_rate: Decimal | None = None) -> dict:
+    from pricing import unit_label
+    raw_retail_rate = item.rate * multiplier if retail_rate is None else retail_rate
+    unit = raw_retail_rate if item.kind.casefold() == "package" else raw_retail_rate / 1000
     return {
         "id": item.id,
         "name": item.name,
@@ -99,6 +101,7 @@ def service_json(item, multiplier: Decimal) -> dict:
         "maximum": item.maximum,
         "retailRate": format(raw_retail_rate, "f"),
         "rateLabel": money_brl(raw_retail_rate),
+        "unitPrice": format(unit,"f"), "unitPriceLabel": unit_label(unit),
         "refill": item.refill,
         "cancel": item.cancel,
         **presentation(item),
@@ -203,7 +206,7 @@ def create_app(panel: Panel, *, own_resources: bool = False) -> FastAPI:
             raise HTTPException(404, "Esta rede não está mais disponível.")
         families = sorted({s.family for s in services}, key=family_sort_key)
         return {"platform": platform, "families": families,
-                "services": [service_json(s, panel.settings.price_multiplier) for s in services]}
+                "services": [service_json(s, panel.settings.price_multiplier, panel.retail_rate(s)) for s in services]}
 
     @app.post("/api/quote")
     async def quote(payload: QuoteInput, init_data: Annotated[str, Header(alias="X-Telegram-Init-Data", max_length=8192)]):

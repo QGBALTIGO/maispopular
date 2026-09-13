@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import sqlite3
 import time
 from urllib.parse import urlencode
@@ -51,6 +52,14 @@ def main() -> None:
         admin.raise_for_status()
         queue = client.get("/api/admin/fulfillment", headers=headers)
         queue.raise_for_status()
+        prices = client.get("/api/admin/prices",headers=headers)
+        prices.raise_for_status()
+        reviews = client.get("/api/reviews",headers=headers)
+        reviews.raise_for_status()
+        search = client.get("/api/search",params={"q":"Instagram"},headers=headers)
+        search.raise_for_status()
+        assert search.json()["services"]
+        assert prices.json()["services"]
         assert catalog.json()["depositOptions"] == list(range(20,101,5))
         assert catalog.json()["isAdmin"] is True
         streaming = client.get("/api/catalog", params={"platform":"Streaming e Apps"}, headers=headers)
@@ -59,13 +68,20 @@ def main() -> None:
         assert any("Netflix" in name for name in names)
         assert any("YouTube Premium" in name for name in names)
         assert any("Disney+" in name for name in names)
-        for path in ("/assets/app.js?v=6", "/assets/app.css?v=6", "/assets/operations.js?v=6", "/assets/theme.js?v=4", "/assets/logo.jpg",
+        for asset in re.findall(r'(?:src|href)="(/assets/[^"<>]+)"',page.text):
+            client.get(asset).raise_for_status()
+        for path in ("/assets/app.js?v=7", "/assets/app.css?v=6", "/assets/operations.js?v=7", "/assets/theme.js?v=8", "/assets/logo.jpg",
                      "/assets/storefront.js?v=6", "/assets/storefront.css?v=6", "/assets/banners/social.png",
                      "/assets/banners/services.png", "/assets/banners/support.png",
-                     "/assets/brands/instagram.svg", "/assets/brands/kwai.png"):
+                     "/assets/brands/instagram.svg", "/assets/brands/kwai.png",
+                     "/assets/prices.js?v=7", "/assets/reviews.js?v=8", "/assets/blue-store.js?v=8",
+                     "/assets/blue-store.css?v=8", "/assets/experience.css?v=7",
+                     "/assets/banners/social-blue-v2.png", "/assets/banners/streaming-blue-v2.png"):
             client.get(path).raise_for_status()
         assert "bottomNav" in page.text
         assert 'id="heroSlides"' in page.text
+        assert 'id="reviewsSection"' in page.text
+        assert 'id="managePrices"' in page.text
         assert 'href="https://baltigoflix.com.br"' in page.text
         assert 'id="themeToggle"' in page.text
         assert 'name="help-faq"' in page.text
@@ -81,7 +97,9 @@ def main() -> None:
                       "wallet": account.status_code, "orders": orders.status_code,
                       "payments": payments.status_code, "admin": admin.status_code,
                       "depositAmounts": catalog.json()["depositOptions"],
-                      "subscriptions": len(names), "fulfillment": queue.status_code, "assets": "ok"}, ensure_ascii=False))
+                      "subscriptions": len(names), "fulfillment": queue.status_code,
+                      "prices":prices.status_code,"reviews":reviews.status_code,"reviewCount":reviews.json()["count"],
+                      "search":search.status_code,"assets": "ok"}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

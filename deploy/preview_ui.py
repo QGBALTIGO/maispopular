@@ -59,6 +59,10 @@ if __name__ == "__main__":
         store.register_user(8, "cliente", "Cliente de QA")
         panel = Panel(config, provider, payments, store)
         panel.grant_credit(7,7,"100","Saldo fictício de QA","preview-wallet")
+        fixture_service = replace(services[0],name="Pedido exclusivo de QA · avaliação")
+        fixture_order = store.create_order(7,fixture_service,{'link':'@fixture','quantity':100},Decimal(1),Decimal(2))
+        store.claim_order(fixture_order['id'],7)
+        store.mark_order(fixture_order['id'],'COMPLETED')
         app = create_app(panel)
         print("Preview uses test auth and isolated wallet; no live orders.", flush=True)
         # Publicly-known test token, not a production credential.

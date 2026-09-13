@@ -291,6 +291,7 @@ async function openOrderDetail(id) {
       }
     }
     container.replaceChildren(panel);
+    window.customerReviews?.orderForm(row, container);
   } catch (error) {
     failure(container, error, () => openOrderDetail(id));
   }

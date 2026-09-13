@@ -12,15 +12,11 @@
   } catch {
     // Storage can be disabled in private browsing or embedded WebViews.
   }
-  const automatic = () =>
-    telegram?.initData && ["light", "dark"].includes(telegram.colorScheme)
-      ? telegram.colorScheme
-      : system.matches
-        ? "dark"
-        : "light";
+  // The storefront opens in its branded dark theme; explicit choices persist.
+  const automatic = () => "dark";
   function apply(theme) {
     root.dataset.theme = theme;
-    const color = theme === "dark" ? "#101722" : "#f7f8fa";
+    const color = theme === "dark" ? "#08090d" : "#f7f8fa";
     document.querySelector('meta[name="theme-color"]').content = color;
     const button = document.getElementById("themeToggle");
     if (button) {

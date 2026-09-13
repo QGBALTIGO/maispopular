@@ -274,13 +274,18 @@ function renderPlatforms() {
       $("subscriptionEntry").append(card);
       continue;
     }
-    const card = action("platform-card", () => selectPlatform(platform.name));
-    card.append(
-      logo(platform.name),
-      icon("chevron", "card-arrow"),
-      element("strong", "", platform.name),
-      element("small", "", `${platform.count} serviços disponíveis`),
+    const card = action(
+      `shop-product social-card social-${brandSlugs[platform.name] || "generic"}`,
+      () => selectPlatform(platform.name),
     );
+    const art = element("div", "product-art");
+    art.append(logo(platform.name), element("strong", "", platform.name));
+    const copy = element("div", "product-copy");
+    copy.append(
+      element("p", "", `${platform.count} serviços disponíveis`),
+      element("span", "product-cta", "Ver categorias →"),
+    );
+    card.append(art, copy);
     grid.append(card);
   }
 }
@@ -317,7 +322,7 @@ function renderFamilies() {
     const card = action("family-card", () => selectFamily(family));
     const copy = element("div", "");
     copy.append(
-      element("strong", "", family.replaceAll("/", " e ")),
+      element("strong", "", categoryLabel(family)),
       element(
         "small",
         "",
@@ -334,12 +339,38 @@ function renderFamilies() {
 }
 function selectFamily(name) {
   state.family = name;
-  $("serviceContext").textContent = state.platform;
+  $("serviceContext").replaceChildren(
+    logo(state.platform),
+    element("span", "", state.platform),
+  );
   $("serviceHeading").textContent = name.replaceAll("/", " e ");
   $("serviceSearch").value = "";
   $("serviceSort").value = "default";
+  renderCategoryTabs();
   renderServices();
   show("services");
+}
+function categoryLabel(name) {
+  return (
+    {
+      "Curtidas/Reações": "Curtidas",
+      "Seguidores/Inscritos": "Seguidores",
+      Compartilhamentos: "Compartilhar",
+    }[name] || name.replaceAll("/", " e ")
+  );
+}
+function renderCategoryTabs() {
+  $("categoryTabs").replaceChildren(
+    ...state.catalog.families.map((name) => {
+      const button = action("category-pill", () => selectFamily(name));
+      button.setAttribute("aria-pressed", String(name === state.family));
+      button.append(
+        icon(familyIcon(name)),
+        element("span", "", categoryLabel(name)),
+      );
+      return button;
+    }),
+  );
 }
 function renderServices() {
   const search = normalize($("serviceSearch").value);
@@ -383,13 +414,13 @@ function renderServices() {
     const footer = element("div", "service-footer");
     const price = element("div", "");
     price.append(
-      element("strong", "", s.rateLabel),
+      element("strong", "", s.unitPriceLabel),
       element(
         "small",
         "",
         s.kind === "package"
           ? "por assinatura / pacote"
-          : "a cada 1.000 unidades",
+          : `por unidade · mín. ${number(s.minimum)}`,
       ),
     );
     const cta = element("span", "service-action", "Ver opções");
@@ -478,7 +509,7 @@ function selectService(s) {
       });
   }
   $("selectedRate").textContent =
-    `${s.rateLabel} ${s.kind === "package" ? "por pacote" : "/ 1.000 un."}`;
+    `${s.unitPriceLabel} ${s.kind === "package" ? "por pacote" : "por unidade"}`;
   updatePrice();
   show("order");
 }

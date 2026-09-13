@@ -82,12 +82,32 @@ class Store:
             id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL REFERENCES orders(id),
             actor_id INTEGER NOT NULL, event TEXT NOT NULL, note TEXT NOT NULL, created_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS pricing_policy (
+            id INTEGER PRIMARY KEY CHECK(id=1), multiplier TEXT NOT NULL DEFAULT '', revision INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id TEXT NOT NULL UNIQUE REFERENCES orders(id),
+            user_id INTEGER NOT NULL REFERENCES users(user_id),
+            display_name TEXT NOT NULL, rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+            comment TEXT NOT NULL, created_at INTEGER NOT NULL
+        );
+        INSERT OR IGNORE INTO pricing_policy(id) VALUES(1);
+        CREATE TABLE IF NOT EXISTS price_overrides (
+            service_id INTEGER PRIMARY KEY, identity TEXT NOT NULL, unit_price TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS pricing_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, admin_id INTEGER NOT NULL, service_id INTEGER,
+            operation TEXT NOT NULL, old_value TEXT NOT NULL, new_value TEXT NOT NULL,
+            reason TEXT NOT NULL, created_at INTEGER NOT NULL
+        );
         """)
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(orders)")}
         if "provider_cost" not in columns:
             self.db.execute("ALTER TABLE orders ADD COLUMN provider_cost TEXT NOT NULL DEFAULT '0'")
         for name, definition in {"retry_at": "INTEGER NOT NULL DEFAULT 0", "queue_reason": "TEXT NOT NULL DEFAULT ''",
-                                 "queue_notice_sent": "INTEGER NOT NULL DEFAULT 0", "manual_admin_id": "INTEGER NOT NULL DEFAULT 0"}.items():
+                                 "queue_notice_sent": "INTEGER NOT NULL DEFAULT 0", "manual_admin_id": "INTEGER NOT NULL DEFAULT 0",
+                                 "pricing_revision": "INTEGER NOT NULL DEFAULT 0"}.items():
             if name not in columns:
                 self.db.execute(f"ALTER TABLE orders ADD COLUMN {name} {definition}")
         self.db.execute("CREATE INDEX IF NOT EXISTS orders_queue ON orders(state,retry_at,created_at)")
@@ -268,17 +288,17 @@ class Store:
             self.db.execute("UPDATE payments SET notified_status=? WHERE id=?", (status, token))
 
     def create_order(self, user_id: int, service, payload: dict, provider_cost, sell_price,
-                     currency: str = "BRL", dry_run: bool = False) -> dict:
+                     currency: str = "BRL", dry_run: bool = False, pricing_revision: int = 0) -> dict:
         token, now = secrets.token_hex(8), int(time.time())
         with self.db:
             self.db.execute("UPDATE orders SET state='ABORTED' WHERE user_id=? AND state='DRAFT'", (user_id,))
             self.db.execute("""INSERT INTO orders
                 (id,user_id,service_id,service_name,kind,payload,target,rate,provider_cost,cost,
-                 currency,dry_run,created_at,expires_at,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                 currency,dry_run,created_at,expires_at,updated_at,pricing_revision)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (token, user_id, service.id, service.name, service.kind,
                  json.dumps(payload, ensure_ascii=False), payload["link"], str(service.rate),
-                 str(provider_cost), str(sell_price), currency, int(dry_run), now, now + 300, now))
+                 str(provider_cost), str(sell_price), currency, int(dry_run), now, now + 300, now, pricing_revision))
         return self.order(token, user_id)
 
     def order(self, token: str, user_id: int | None = None) -> dict | None:
@@ -334,10 +354,12 @@ class Store:
             self.db.execute("UPDATE orders SET state='ABORTED' WHERE user_id=? AND state='DRAFT'", (user_id,))
             self.db.execute("UPDATE actions SET state='ABORTED' WHERE user_id=? AND state='DRAFT'", (user_id,))
 
-    def claim_order(self, token: str, user_id: int, *, queued: bool = False) -> bool:
+    def claim_order(self, token: str, user_id: int, *, queued: bool = False, pricing_revision: int | None = None) -> bool:
         self.db.execute("BEGIN IMMEDIATE")
         try:
             row = self.order(token, user_id)
+            if pricing_revision is not None and self.db.execute("SELECT revision FROM pricing_policy WHERE id=1").fetchone()[0] != pricing_revision:
+                raise ValueError("Os preços foram atualizados. Revise um novo orçamento antes de confirmar.")
             if not row or row["state"] != "DRAFT" or row["expires_at"] < int(time.time()):
                 self.db.rollback()
                 return False

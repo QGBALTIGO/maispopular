@@ -11,16 +11,29 @@
     <link rel="icon" href="/assets/logo.jpg" />
     <link rel="stylesheet" href="/assets/app.css?v=6" />
     <link rel="stylesheet" href="/assets/storefront.css?v=6" />
+    <link rel="stylesheet" href="/assets/experience.css?v=9" />
+    <link rel="stylesheet" href="/assets/blue-store.css?v=10" />
     <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
-    <script src="/assets/theme.js?v=4"></script>
+    <script src="/assets/theme.js?v=9"></script>
   </head>
   <body>
     <header class="topbar">
+      <button id="openShopMenu" class="header-square" aria-label="Abrir menu">
+        <span data-icon="grid"></span>
+      </button>
       <button class="brand" id="brandHome" aria-label="Mais Popular, início">
         <img src="/assets/logo.jpg" alt="" width="40" height="40" /><span
           >Mais Popular<small>SUA LOJA DIGITAL</small></span
-        ></button
-      ><button
+        >
+      </button>
+      <button
+        id="shopSearch"
+        class="shop-search-button"
+        aria-label="Buscar produto"
+      >
+        <span data-icon="search"></span><span>Buscar produto</span>
+      </button>
+      <button
         id="balanceButton"
         class="balance"
         aria-label="Abrir minha carteira"
@@ -82,6 +95,50 @@
       </section>
       <div id="app" class="hidden">
         <section id="platforms" class="view">
+          <section class="welcome-hero">
+            <div class="welcome-copy">
+              <p id="welcomeText" class="greeting">Sua loja digital</p>
+              <h1>Bem-vindo(a) à<br /><span>Mais Popular</span></h1>
+              <p>
+                Redes sociais, streaming e apps em um só lugar. Pague com Pix e
+                acompanhe cada pedido por aqui.
+              </p>
+              <div class="welcome-actions">
+                <a class="primary-button" href="#socialSection"
+                  >Ver produtos <span>→</span></a
+                ><a
+                  class="secondary-button"
+                  href="https://t.me/suportemaispopular"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Falar com suporte</a
+                >
+              </div>
+              <div class="welcome-trust">
+                <span data-icon="shield"></span>Preço claro · Compra pelo seu
+                saldo
+              </div>
+            </div>
+            <div
+              id="floatingProducts"
+              class="floating-products"
+              aria-label="Explore a loja"
+            ></div>
+          </section>
+          <section class="wallet-feature">
+            <div>
+              <p class="eyebrow">SUA CARTEIRA DIGITAL</p>
+              <h2>Seu próximo pedido começa aqui.</h2>
+              <p>Adicione de R$ 20 a R$ 100 com Pix e use seu saldo na loja.</p>
+            </div>
+            <button id="heroDeposit" class="primary-button">
+              Adicionar saldo <span>→</span>
+            </button>
+            <div class="feature-points">
+              <span>QR Code no app</span><span>Pix copia e cola</span
+              ><span>Histórico de pedidos</span>
+            </div>
+          </section>
           <section
             class="shop-hero"
             aria-label="Destaques da loja"
@@ -95,18 +152,6 @@
               </button>
             </div>
           </section>
-          <div class="page-intro">
-            <p id="welcomeText" class="greeting">Bem-vindo à Mais Popular</p>
-            <h1>
-              Seu próximo upgrade<br /><span class="accent-text"
-                >começa aqui.</span
-              >
-            </h1>
-            <p>
-              Redes sociais, assinaturas e ferramentas. Tudo na sua loja
-              digital.
-            </p>
-          </div>
           <nav class="shop-shortcuts" aria-label="Seções da loja">
             <a href="#socialSection">Redes sociais</a
             ><a href="#streamingSection">Streaming</a
@@ -160,6 +205,33 @@
               >
             </p>
           </div>
+          <section
+            id="reviewsSection"
+            class="reviews-section"
+            aria-labelledby="reviewsHeading"
+          >
+            <p class="eyebrow">EXPERIÊNCIAS DOS CLIENTES</p>
+            <h2 id="reviewsHeading">Avaliações dos clientes</h2>
+            <div id="reviewsSummary" class="reviews-summary" aria-live="polite">
+              <p>Carregando avaliações…</p>
+            </div>
+            <div id="reviewsList"></div>
+            <button id="moreReviews" class="secondary-button hidden">
+              Ver mais avaliações
+            </button>
+            <p id="reviewsError" class="field-error" role="alert"></p>
+            <div class="reviews-actions">
+              <button id="reviewOrders" class="primary-button">
+                Avaliar um pedido</button
+              ><button id="refreshReviews" class="text-button">
+                Atualizar avaliações
+              </button>
+            </div>
+            <p class="review-policy">
+              Uma avaliação por pedido entregue. Todas as notas contam na média.
+              O selo confirma uma compra concluída nesta loja.
+            </p>
+          </section>
         </section>
         <section id="families" class="view hidden">
           <button class="back" data-back="platforms">
@@ -183,6 +255,12 @@
             <p id="serviceContext" class="greeting"></p>
             <h1 id="serviceHeading">Escolha seu serviço</h1>
           </div>
+          <div
+            id="categoryTabs"
+            class="category-tabs"
+            role="group"
+            aria-label="Categorias disponíveis"
+          ></div>
           <label class="search"
             ><span data-icon="search"></span
             ><input
@@ -221,6 +299,18 @@
               </summary>
               <div id="selectedDescription"></div>
             </details>
+            <a
+              id="productSupport"
+              class="support-product"
+              href="https://t.me/suportemaispopular"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Dúvidas ou quer consultar um teste? Fale com o suporte ↗</a
+            >
+            <small class="support-caption"
+              >Testes dependem da disponibilidade e das condições informadas
+              pelo atendimento.</small
+            >
           </article>
           <form id="orderForm" novalidate>
             <div class="form-heading">
@@ -428,6 +518,9 @@
             Atualizar painel
           </button>
           <div id="adminStats" class="admin-stats"></div>
+          <button id="managePrices" class="primary-button full-button">
+            Gerenciar preços do catálogo
+          </button>
           <h2 class="section-title">Fila de entrega</h2>
           <p class="intro-copy">
             Pedidos pagos em processamento. Assumir a entrega manual bloqueia o
@@ -482,6 +575,61 @@
           <h2 class="section-title">Últimos créditos administrativos</h2>
           <div id="adminCredits" class="activity-list"></div>
           <p id="adminError" class="field-error" role="alert"></p>
+        </section>
+        <section id="prices" class="view hidden">
+          <button id="backPriceAdmin" class="back">← Administração</button>
+          <div class="page-intro compact">
+            <p class="greeting">Gestão do catálogo</p>
+            <h1>Preços da loja</h1>
+            <p>Altere preços futuros. Compras já pagas não são modificadas.</p>
+          </div>
+          <details class="description">
+            <summary>Regra geral de preços</summary>
+            <form id="multiplierForm">
+              <p class="intro-copy">
+                Preço de custo × multiplicador. Aplica-se a todos os serviços
+                sem preço personalizado.
+              </p>
+              <label class="field"
+                ><span>Multiplicador geral (ex.: 2 = dobro do custo)</span
+                ><input id="priceMultiplier" inputmode="decimal" required
+              /></label>
+              <label class="field"
+                ><span>Motivo da alteração</span
+                ><input
+                  id="multiplierReason"
+                  minlength="5"
+                  maxlength="200"
+                  required
+              /></label>
+              <button class="primary-button" type="submit">
+                Revisar regra geral
+              </button>
+            </form>
+          </details>
+          <label class="search"
+            ><span data-icon="search"></span
+            ><input
+              id="priceSearch"
+              type="search"
+              placeholder="Buscar nome, rede ou código"
+              aria-label="Buscar preços"
+          /></label>
+          <p id="priceCount" class="intro-copy" role="status"></p>
+          <div id="priceList" class="service-list"></div>
+          <div class="price-pagination">
+            <button id="pricePrevious" class="secondary-button">
+              ← Anterior</button
+            ><button id="priceNext" class="secondary-button">Próximos →</button>
+          </div>
+          <details class="description">
+            <summary>Histórico de alterações de preço</summary>
+            <div id="priceAudit" class="activity-list"></div>
+          </details>
+          <p id="priceError" class="field-error" role="alert"></p>
+          <button id="refreshPrices" class="secondary-button">
+            Atualizar tabela de preços
+          </button>
         </section>
         <section id="orders" class="view hidden">
           <div class="page-intro compact">
@@ -594,6 +742,71 @@
       ><button data-nav="help"><span data-icon="help"></span>Ajuda</button>
     </nav>
     <div id="toast" class="toast hidden" role="status"></div>
+    <a
+      class="floating-support"
+      href="https://t.me/suportemaispopular"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Falar com suporte"
+      ><span data-icon="help"></span
+    ></a>
+    <dialog
+      id="shopMenu"
+      class="modal shop-menu"
+      aria-labelledby="shopMenuTitle"
+    >
+      <div class="modal-card">
+        <div class="modal-top">
+          <h2 id="shopMenuTitle">Mais Popular</h2>
+          <button
+            id="closeShopMenu"
+            class="icon-button"
+            aria-label="Fechar menu"
+          >
+            ×
+          </button>
+        </div>
+        <button data-shop-nav="platforms">Catálogo <span>→</span></button
+        ><button data-shop-nav="orders">Meus pedidos <span>→</span></button
+        ><button data-shop-nav="wallet">Minha carteira <span>→</span></button
+        ><button data-shop-nav="help">Ajuda e suporte <span>→</span></button
+        ><button id="menuReviews">Avaliações <span>→</span></button
+        ><button id="menuAdmin" class="hidden">
+          Administração <span>→</span></button
+        ><a
+          href="https://baltigoflix.com.br"
+          target="_blank"
+          rel="noopener noreferrer"
+          >BaltigoFlix ↗</a
+        >
+      </div>
+    </dialog>
+    <dialog id="globalSearch" class="modal" aria-labelledby="globalSearchTitle">
+      <div class="modal-card">
+        <div class="modal-top">
+          <h2 id="globalSearchTitle">Buscar produto</h2>
+          <button
+            id="closeGlobalSearch"
+            class="icon-button"
+            aria-label="Fechar busca"
+          >
+            ×
+          </button>
+        </div>
+        <label class="field"
+          ><span>Nome, rede social ou código</span
+          ><input
+            id="globalSearchInput"
+            type="search"
+            maxlength="80"
+            placeholder="Ex.: Netflix, Instagram, curtidas"
+        /></label>
+        <p id="globalSearchStatus" role="status">
+          Digite pelo menos 2 caracteres.
+        </p>
+        <div id="globalSearchResults" class="service-list"></div>
+      </div>
+    </dialog>
     <dialog id="reviewModal" class="modal" aria-labelledby="reviewTitle">
       <div class="modal-card">
         <div class="modal-top">
@@ -648,8 +861,32 @@
         ><button value="no" class="secondary-button" autofocus>Voltar</button>
       </form>
     </dialog>
-    <script src="/assets/app.js?v=6" defer></script>
-    <script src="/assets/operations.js?v=6" defer></script>
-    <script src="/assets/storefront.js?v=6" defer></script>
+    <dialog id="priceEditor" class="modal">
+      <form id="priceEditForm" class="modal-card">
+        <h2 id="priceEditTitle">Editar preço</h2>
+        <p id="priceEditContext" class="intro-copy"></p>
+        <label class="field"
+          ><span id="priceEditLabel">Preço por unidade (R$)</span
+          ><input id="priceEditValue" inputmode="decimal" required
+        /></label>
+        <label class="field"
+          ><span>Motivo da alteração</span
+          ><input id="priceEditReason" minlength="5" maxlength="200" required
+        /></label>
+        <p id="priceEditError" class="field-error" role="alert"></p>
+        <button class="primary-button" type="submit">Revisar alteração</button
+        ><button id="priceReset" class="secondary-button" type="button">
+          Voltar à regra geral</button
+        ><button id="priceEditClose" class="text-button" type="button">
+          Voltar
+        </button>
+      </form>
+    </dialog>
+    <script src="/assets/app.js?v=9" defer></script>
+    <script src="/assets/operations.js?v=9" defer></script>
+    <script src="/assets/storefront.js?v=9" defer></script>
+    <script src="/assets/prices.js?v=9" defer></script>
+    <script src="/assets/blue-store.js?v=10" defer></script>
+    <script src="/assets/reviews.js?v=9" defer></script>
   </body>
 </html>

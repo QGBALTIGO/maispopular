@@ -6,8 +6,9 @@ import json
 import time
 from decimal import Decimal
 
+import pricing
 from config import Settings
-from domain import build_payload, check_quote, decimal_value, retail_price
+from domain import build_payload, check_quote, decimal_value
 from payments import Cakto, PaymentError, PaymentUnavailable
 from provider import ProviderError, ServiceProvider, UncertainWrite
 from storage import Store
@@ -37,16 +38,17 @@ class Panel:
         return service
 
     def retail_rate(self, service) -> Decimal:
-        return retail_price(service.rate, self.settings.price_multiplier)
+        return pricing.rate(self, service)[0]
 
     async def quote(self, user_id: int, service_id: int, target: str,
                     value: str | None = None, answer: str | None = None) -> dict:
         service = await self.service(service_id, force=True)
         payload, provider_cost = build_payload(service, target, value, answer)
-        sell_price = retail_price(provider_cost, self.settings.price_multiplier)
+        retail_rate, revision, _ = pricing.rate(self, service)
+        sell_price = pricing.total(service, payload, retail_rate)
         if sell_price > self.settings.max_order_cost:
             raise ValueError("Este pedido ultrapassa o limite por compra. Reduza a quantidade.")
-        return self.store.create_order(user_id, service, payload, provider_cost, sell_price)
+        return self.store.create_order(user_id, service, payload, provider_cost, sell_price, pricing_revision=revision)
 
     async def submit(self, token: str, user_id: int) -> dict:
         async with self.mutation_lock:
@@ -63,11 +65,12 @@ class Panel:
                 self.store.mark_order(token, "EXPIRED")
                 raise ValueError("O serviço foi atualizado. Monte um novo pedido para ver o valor atual.")
             provider_cost = check_quote(service, json.loads(row["payload"]))
-            sell_price = retail_price(provider_cost, self.settings.price_multiplier)
-            if provider_cost != decimal_value(row["provider_cost"]) or sell_price != decimal_value(row["cost"]):
+            retail_rate, revision, _ = pricing.rate(self, service)
+            sell_price = pricing.total(service, json.loads(row["payload"]), retail_rate)
+            if revision != row["pricing_revision"] or provider_cost != decimal_value(row["provider_cost"]) or sell_price != decimal_value(row["cost"]):
                 self.store.mark_order(token, "EXPIRED")
                 raise ValueError("O preço mudou. Monte um novo pedido para confirmar o valor atualizado.")
-            if not self.store.claim_order(token, user_id, queued=True):
+            if not self.store.claim_order(token, user_id, queued=True, pricing_revision=revision):
                 raise ValueError("Confirmação já utilizada, cancelada ou expirada.")
             from fulfillment import dispatch
             return await dispatch(self, token)
