@@ -106,6 +106,18 @@
   padding: 12px;
 }
 @media (max-width: 700px) {
+  .social-card .product-art {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+  .social-card .product-art .brand-icon {
+    flex-basis: 33%;
+    width: 33%;
+  }
+  .social-card .product-art strong {
+    font-size: clamp(10px, 3vw, 17px);
+    overflow-wrap: normal;
+  }
   .shop-hero {
     margin-top: 12px;
   }
