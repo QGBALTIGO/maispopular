@@ -278,8 +278,9 @@ function renderPlatforms() {
       `shop-product social-card social-${brandSlugs[platform.name] || "generic"}`,
       () => selectPlatform(platform.name),
     );
-    const art = element("div", "product-art");
-    art.append(logo(platform.name), element("strong", "", platform.name));
+    const art = customPlatformArt(platform) || element("div", "product-art");
+    if (!platform.banner?.custom)
+      art.append(logo(platform.name), element("strong", "", platform.name));
     const copy = element("div", "product-copy");
     copy.append(
       element("h3", "", platform.name),
@@ -382,29 +383,35 @@ function renderCategoryTabs() {
     }),
   );
 }
-function customProductArt(service) {
-  if (!service.banner?.custom) return null;
+function customCatalogArt(item, label) {
+  if (!item.banner?.custom) return null;
   const art = element("div", "product-art custom-product-art");
   const image = element(
     "img",
-    `fit-${service.banner.fit} pos-${service.banner.position}`,
+    `fit-${item.banner.fit} pos-${item.banner.position}`,
   );
-  image.src = service.banner.url;
-  image.alt = service.displayName;
+  image.src = item.banner.url;
+  image.alt = label;
   image.loading = "lazy";
   image.addEventListener(
     "error",
     () => {
       art.classList.remove("custom-product-art");
       art.replaceChildren(
-        logo(service.platform, service.brand),
-        element("strong", "", service.displayName),
+        logo(item.platform || item.name, item.brand),
+        element("strong", "", label),
       );
     },
     { once: true },
   );
   art.append(image);
   return art;
+}
+function customProductArt(service) {
+  return customCatalogArt(service, service.displayName);
+}
+function customPlatformArt(platform) {
+  return customCatalogArt(platform, platform.name);
 }
 function renderServices() {
   const search = normalize($("serviceSearch").value);
@@ -433,7 +440,8 @@ function renderServices() {
   }
   for (const s of rows) {
     const card = action("service-card", () => selectService(s));
-    const banner = customProductArt(s);
+    const banner =
+      s.platform === "Streaming e Apps" ? customProductArt(s) : null;
     if (banner) card.append(banner);
     const top = element("div", "service-top");
     top.append(

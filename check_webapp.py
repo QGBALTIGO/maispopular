@@ -87,6 +87,8 @@ def main() -> None:
         product_banners=client.get('/api/admin/product-banners',headers=headers)
         product_banners.raise_for_status()
         assert product_banners.json()['services']
+        assert product_banners.json()['platforms']
+        assert all(p['name'] != 'Streaming e Apps' for p in product_banners.json()['platforms'])
         assert all('banner' in s for s in streaming.json()['services'])
         banners=client.get('/api/banners',headers=headers)
         banners.raise_for_status()

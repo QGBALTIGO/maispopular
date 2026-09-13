@@ -6,6 +6,7 @@ from io import BytesIO
 import test_webapp
 from PIL import Image
 
+import platform_banners
 import product_banners
 from pricing import identity
 from storage import Store
@@ -19,16 +20,13 @@ class ProductBannerTests(unittest.IsolatedAsyncioTestCase):
         self.panel.settings = replace(self.panel.settings, admin_ids=frozenset({7}))
         buffer = BytesIO()
         Image.new("RGB", (160, 90), "blue").save(buffer, format="PNG")
-        return (
-            {
-                "identity": identity(await self.panel.service(42)),
-                "revision": 0,
-                "image": base64.b64encode(buffer.getvalue()).decode(),
-                "fit": "cover",
-                "position": "top",
-            }
-            | changes
-        )
+        return {
+            "identity": identity(await self.panel.service(42)),
+            "revision": 0,
+            "image": base64.b64encode(buffer.getvalue()).decode(),
+            "fit": "cover",
+            "position": "top",
+        } | changes
 
     async def save(self, payload, service_id=42, headers=None):
         return await self.client.post(
@@ -155,8 +153,81 @@ class ProductBannerTests(unittest.IsolatedAsyncioTestCase):
             "/api/admin/product-banners", headers=self.headers
         )
         self.assertEqual(listing.status_code, 200)
-        self.assertFalse(listing.json()["services"][0]["banner"]["custom"])
+        self.assertFalse(listing.json()["platforms"][0]["banner"]["custom"])
+        self.assertEqual(listing.json()["services"], [])
         home = (await self.client.get("/")).text
         self.assertIn('id="manageProductBanners"', home)
         self.assertIn('id="productBannerFile"', home)
         self.assertNotIn('id="reviewsSection"', home)
+
+    async def test_social_network_uses_one_general_catalog_banner(self):
+        payload = await self.payload()
+        platform_payload = {
+            "platform": "Instagram",
+            "identity": platform_banners.identity("Instagram"),
+            "revision": 0,
+            "image": payload["image"],
+            "fit": "cover",
+            "position": "bottom",
+        }
+        result = await self.client.post(
+            "/api/admin/platform-banners", headers=self.headers, json=platform_payload
+        )
+        self.assertEqual(result.status_code, 200, result.text)
+        artwork = result.json()
+        self.assertTrue(artwork["custom"])
+        self.assertEqual(artwork["position"], "bottom")
+        bootstrap = (
+            await self.client.get("/api/bootstrap", headers=self.headers)
+        ).json()
+        instagram = next(p for p in bootstrap["platforms"] if p["name"] == "Instagram")
+        self.assertEqual(instagram["banner"], artwork)
+        catalog = (
+            await self.client.get(
+                "/api/catalog?platform=Instagram", headers=self.headers
+            )
+        ).json()
+        self.assertFalse(catalog["services"][0]["banner"]["custom"])
+        media = await self.client.get(artwork["url"])
+        self.assertEqual(media.headers["content-type"], "image/png")
+        stale = await self.client.post(
+            "/api/admin/platform-banners", headers=self.headers, json=platform_payload
+        )
+        self.assertEqual(stale.status_code, 400)
+        restored = await self.client.post(
+            "/api/admin/platform-banners",
+            headers=self.headers,
+            json=platform_payload | {"revision": 1, "image": "", "reset": True},
+        )
+        self.assertFalse(restored.json()["custom"])
+        self.assertEqual((await self.client.get(artwork["url"])).status_code, 404)
+
+    async def test_social_banner_rejects_nonadmin_unknown_network_and_wrong_identity(
+        self,
+    ):
+        payload = await self.payload()
+        data = {
+            "platform": "Instagram",
+            "identity": platform_banners.identity("Instagram"),
+            "revision": 0,
+            "image": payload["image"],
+        }
+        denied = await self.client.post(
+            "/api/admin/platform-banners",
+            headers={"X-Telegram-Init-Data": test_webapp.signed_init(8)},
+            json=data,
+        )
+        self.assertEqual(denied.status_code, 403)
+        unknown = await self.client.post(
+            "/api/admin/platform-banners",
+            headers=self.headers,
+            json=data | {"platform": "Rede inexistente"},
+        )
+        self.assertEqual(unknown.status_code, 404)
+        wrong = await self.client.post(
+            "/api/admin/platform-banners",
+            headers=self.headers,
+            json=data | {"identity": "0" * 64},
+        )
+        self.assertEqual(wrong.status_code, 400)
+        self.assertFalse(platform_banners.metadata(self.store))

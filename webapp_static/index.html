@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/assets/storefront.css?v=6" />
     <link rel="stylesheet" href="/assets/experience.css?v=9" />
     <link rel="stylesheet" href="/assets/blue-store.css?v=10" />
-    <link rel="stylesheet" href="/assets/catalog-compact.css?v=13" />
+    <link rel="stylesheet" href="/assets/catalog-compact.css?v=14" />
     <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
     <script src="/assets/theme.js?v=9"></script>
   </head>
@@ -455,7 +455,7 @@
             id="manageProductBanners"
             class="secondary-button full-button"
           >
-            Banners dos produtos
+            Banners do catálogo
           </button>
           <button id="manageBanners" class="secondary-button full-button">
             Gerenciar banners da loja
@@ -519,10 +519,10 @@
           <button id="backProductBanners" class="back">← Administração</button>
           <div class="page-intro compact">
             <p class="eyebrow">IMAGENS DOS CARDS</p>
-            <h1>Banners dos produtos</h1>
+            <h1>Banners do catálogo</h1>
             <p>
-              Escolha um produto e personalize sua imagem. Os preços, detalhes e
-              banners do início não serão alterados.
+              Escolha uma rede social para trocar o banner geral do catálogo, ou
+              personalize um produto de streaming e apps.
             </p>
           </div>
           <label class="field"
@@ -530,11 +530,11 @@
             ><input
               id="productBannerSearch"
               type="search"
-              placeholder="Brainly, Qconcursos ou código"
+              placeholder="Instagram, Brainly ou código"
               maxlength="100"
           /></label>
           <label class="field"
-            ><span>Categoria</span
+            ><span>Tipo de card</span
             ><select id="productBannerPlatform"></select
           ></label>
           <p id="productBannerCount" class="muted" aria-live="polite"></p>
@@ -549,14 +549,14 @@
             <h2 id="productBannerName"></h2>
             <p id="productBannerCode" class="muted"></p>
             <label class="field"
-              ><span>Imagem do produto</span
+              ><span>Imagem do card</span
               ><input
                 id="productBannerFile"
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
               /><small
                 >PNG, JPG ou WebP, até 4 MB. Recomendado: 1600 × 900 (16:9). A
-                imagem substitui toda a arte do card.</small
+                imagem substitui toda a arte do card selecionado.</small
               ></label
             >
             <p class="eyebrow">PRÉVIA DO CARD</p>
@@ -995,12 +995,12 @@
         </button>
       </form>
     </dialog>
-    <script src="/assets/app.js?v=13" defer></script>
+    <script src="/assets/app.js?v=14" defer></script>
     <script src="/assets/operations.js?v=11" defer></script>
     <script src="/assets/storefront.js?v=13" defer></script>
     <script src="/assets/prices.js?v=9" defer></script>
     <script src="/assets/blue-store.js?v=11" defer></script>
     <script src="/assets/banners-admin.js?v=11" defer></script>
-    <script src="/assets/product-banners-admin.js?v=13" defer></script>
+    <script src="/assets/product-banners-admin.js?v=14" defer></script>
   </body>
 </html>

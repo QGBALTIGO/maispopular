@@ -97,6 +97,12 @@ class Store:
             mime TEXT NOT NULL DEFAULT '', revision INTEGER NOT NULL,
             admin_id INTEGER NOT NULL, updated_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS platform_banners (
+            platform TEXT PRIMARY KEY, identity TEXT NOT NULL,
+            fit TEXT NOT NULL, position TEXT NOT NULL, image BLOB,
+            mime TEXT NOT NULL DEFAULT '', revision INTEGER NOT NULL,
+            admin_id INTEGER NOT NULL, updated_at INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             order_id TEXT NOT NULL UNIQUE REFERENCES orders(id),

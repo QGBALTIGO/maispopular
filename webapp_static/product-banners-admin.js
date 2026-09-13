@@ -1,9 +1,10 @@
 "use strict";
 (() => {
-  let products = [],
+  let items = [],
     selected = null,
     image = "",
-    locked = false,
+    localUrl = "";
+  let locked = false,
     reading = false,
     request = 0,
     limit = 20;
@@ -21,48 +22,80 @@
   function disable(value) {
     controls.forEach((id) => ($(id).disabled = value));
   }
+  function decoratedBanner() {
+    return {
+      ...selected.banner,
+      custom: Boolean(localUrl || selected.banner.custom),
+      url: localUrl || selected.banner.url,
+      fit: $("productBannerFit").value,
+      position: $("productBannerPosition").value,
+    };
+  }
+  function defaultArt(item) {
+    const art = element("div", "product-art");
+    art.append(
+      logo(
+        item.editorType === "platform" ? item.name : item.platform,
+        item.brand,
+      ),
+      element("strong", "", item.displayName),
+    );
+    return art;
+  }
   function preview() {
     if (!selected) return;
-    const service = {
-      ...selected,
-      banner: {
-        ...selected.banner,
-        fit: $("productBannerFit").value,
-        position: $("productBannerPosition").value,
-      },
-    };
-    if (image)
-      service.banner = {
-        ...service.banner,
-        custom: true,
-        url: `data:image/${$("productBannerFile").files[0].type.split("/")[1]};base64,${image}`,
-      };
-    const art = customProductArt(service) || element("div", "product-art");
-    if (!service.banner.custom)
-      art.append(
-        logo(service.platform, service.brand),
-        element("strong", "", service.displayName),
-      );
+    const item = { ...selected, banner: decoratedBanner() };
+    const art =
+      (item.editorType === "platform"
+        ? customPlatformArt(item)
+        : customProductArt(item)) || defaultArt(item);
     const copy = element("div", "product-copy");
-    copy.append(
-      element("h3", "", service.displayName),
-      element("p", "", service.summary),
-      element("strong", "product-price", service.unitPriceLabel),
-      element("span", "product-cta", "Ver detalhes →"),
-    );
+    if (item.editorType === "platform") {
+      copy.append(
+        element("h3", "", item.displayName),
+        element("p", "", item.summary),
+        element("small", "social-from", "A partir de"),
+        element("strong", "product-price", item.fromPriceLabel),
+        element(
+          "small",
+          "",
+          item.fromKind === "package"
+            ? "por pacote"
+            : `por unidade · mín. ${number(item.fromMinimum)}`,
+        ),
+        element("span", "product-cta", "Ver categorias →"),
+      );
+    } else {
+      copy.append(
+        element("h3", "", item.displayName),
+        element("p", "", item.summary),
+        element("strong", "product-price", item.unitPriceLabel),
+        element(
+          "small",
+          "",
+          item.kind === "package"
+            ? "por assinatura / pacote"
+            : `por unidade · mín. ${number(item.minimum)}`,
+        ),
+        element("span", "product-cta", "Ver detalhes →"),
+      );
+    }
     $("productBannerPreview").replaceChildren(art, copy);
   }
-  function choose(service, scroll = true) {
+  function choose(item, scroll = true) {
     if (locked || reading) return;
-    selected = service;
+    selected = item;
     image = "";
+    localUrl = "";
     request++;
     $("productBannerFile").value = "";
-    $("productBannerName").textContent = service.displayName;
+    $("productBannerName").textContent = item.displayName;
     $("productBannerCode").textContent =
-      `${service.platform} · Cód. ${service.id}`;
-    $("productBannerFit").value = service.banner.fit;
-    $("productBannerPosition").value = service.banner.position;
+      item.editorType === "platform"
+        ? "Redes sociais · banner geral do catálogo"
+        : `${item.platform} · Cód. ${item.id}`;
+    $("productBannerFit").value = item.banner.fit;
+    $("productBannerPosition").value = item.banner.position;
     $("productBannerError").textContent = "";
     $("productBannerForm").classList.remove("hidden");
     preview();
@@ -71,31 +104,63 @@
   }
   function render() {
     const term = normalize($("productBannerSearch").value);
-    const platform = $("productBannerPlatform").value;
-    const rows = products.filter(
-      (s) =>
-        (!platform || s.platform === platform) &&
-        normalize(`${s.id} ${s.name} ${s.displayName}`).includes(term),
+    const section = $("productBannerPlatform").value;
+    const rows = items.filter(
+      (item) =>
+        (!section || item.editorType === section) &&
+        normalize(`${item.id || ""} ${item.name} ${item.displayName}`).includes(
+          term,
+        ),
     );
-    $("productBannerCount").textContent = `${rows.length} produtos encontrados`;
+    $("productBannerCount").textContent =
+      `${rows.length} ${rows.length === 1 ? "card encontrado" : "cards encontrados"}`;
     $("productBannerList").replaceChildren(
-      ...rows.slice(0, limit).map((s) => {
-        const button = action("product-banner-option", () => choose(s));
-        button.setAttribute("aria-pressed", String(selected?.id === s.id));
-        const text = element("span", "");
-        text.append(
-          element("strong", "", s.displayName),
+      ...rows.slice(0, limit).map((item) => {
+        const button = action("product-banner-option", () => choose(item));
+        button.setAttribute(
+          "aria-pressed",
+          String(selected?.editorKey === item.editorKey),
+        );
+        const copy = element("span", "");
+        copy.append(
+          element("strong", "", item.displayName),
           element(
             "small",
             "",
-            `Cód. ${s.id} · ${s.banner.custom ? "Imagem personalizada" : "Arte original"}`,
+            `${item.editorType === "platform" ? "Banner geral da rede" : `Cód. ${item.id}`} · ${item.banner.custom ? "Imagem personalizada" : "Arte original"}`,
           ),
         );
-        button.append(logo(s.platform, s.brand), text);
+        button.append(
+          logo(
+            item.editorType === "platform" ? item.name : item.platform,
+            item.brand,
+          ),
+          copy,
+        );
         return button;
       }),
     );
     $("moreProductBanners").classList.toggle("hidden", rows.length <= limit);
+  }
+  function buildItems(data) {
+    const platformItems = data.platforms.map((entry) => {
+      const visible = state.bootstrap.platforms.find(
+        (p) => p.name === entry.name,
+      );
+      return {
+        ...visible,
+        ...entry,
+        editorType: "platform",
+        editorKey: `platform:${entry.name}`,
+        displayName: entry.name,
+      };
+    });
+    const serviceItems = data.services.map((service) => ({
+      ...service,
+      editorType: "service",
+      editorKey: `service:${service.id}`,
+    }));
+    return [...platformItems, ...serviceItems];
   }
   async function load() {
     if (locked || reading || !state.bootstrap?.isAdmin) return;
@@ -103,21 +168,18 @@
     locked = true;
     disable(true);
     try {
-      const data = await api("/api/admin/product-banners");
-      products = data.services.sort((a, b) =>
-        a.displayName.localeCompare(b.displayName, "pt-BR"),
-      );
-      const current = $("productBannerPlatform").value;
-      const platforms = [...new Set(products.map((s) => s.platform))].sort();
+      const previous = selected?.editorKey;
+      items = buildItems(await api("/api/admin/product-banners"));
       $("productBannerPlatform").replaceChildren(
-        new Option("Todos os produtos", ""),
-        ...platforms.map((p) => new Option(p, p)),
+        new Option("Redes sociais — banner geral", "platform"),
+        new Option("Streaming e apps — por produto", "service"),
+        new Option("Todos os cards", ""),
       );
-      $("productBannerPlatform").value =
-        current || (selected ? "" : "Streaming e Apps");
-      if (!platforms.includes($("productBannerPlatform").value))
-        $("productBannerPlatform").value = "";
-      const updated = products.find((s) => s.id === selected?.id);
+      if (
+        !["platform", "service", ""].includes($("productBannerPlatform").value)
+      )
+        $("productBannerPlatform").value = "platform";
+      const updated = items.find((item) => item.editorKey === previous);
       locked = false;
       if (updated) choose(updated, false);
       else {
@@ -136,6 +198,7 @@
   $("productBannerFile").addEventListener("change", async () => {
     const version = ++request;
     image = "";
+    localUrl = "";
     const file = $("productBannerFile").files[0];
     preview();
     if (!file) return;
@@ -158,6 +221,7 @@
         reader.readAsDataURL(file);
       });
       if (version !== request) return;
+      localUrl = data;
       image = data.split(",")[1];
       preview();
       $("productBannerError").textContent = "";
@@ -172,43 +236,44 @@
     if (locked || reading || !selected) return;
     if (!reset && !image && !selected.banner.custom) {
       $("productBannerError").textContent =
-        "Escolha uma imagem para este produto.";
+        "Escolha uma imagem para este card.";
       return;
     }
     locked = true;
     disable(true);
     try {
+      const subject =
+        selected.editorType === "platform"
+          ? `a rede ${selected.displayName}`
+          : `o produto ${selected.displayName}`;
       if (
         !(await confirmOperation(
-          reset ? "Restaurar arte original?" : "Publicar imagem do produto?",
-          `${selected.displayName} · Cód. ${selected.id}. Somente a imagem deste produto será alterada.`,
+          reset ? "Restaurar arte original?" : "Publicar imagem do card?",
+          `Somente ${subject} será alterado.`,
         ))
       )
         return;
-      const result = await post(`/api/admin/product-banners/${selected.id}`, {
+      const payload = {
         identity: selected.banner.identity,
         revision: selected.banner.revision,
         fit: $("productBannerFit").value,
         position: $("productBannerPosition").value,
         image: reset ? "" : image,
         reset,
-      });
+      };
+      const result =
+        selected.editorType === "platform"
+          ? await post("/api/admin/platform-banners", {
+              ...payload,
+              platform: selected.name,
+            })
+          : await post(`/api/admin/product-banners/${selected.id}`, payload);
       selected.banner = result;
-      if (state.catalog) {
-        const cached = state.catalog.services.find((s) => s.id === selected.id);
-        if (cached) cached.banner = result;
-      }
       locked = false;
       choose(selected, false);
       locked = true;
-      toast(
-        reset ? "Arte original restaurada." : "Imagem do produto publicada.",
-      );
-      try {
-        await window.storefront.refresh();
-      } catch (_) {
-        toast("Imagem salva. Reabra o catálogo para atualizar a vitrine.");
-      }
+      await window.storefront.refresh();
+      toast(reset ? "Arte original restaurada." : "Imagem do card publicada.");
     } catch (error) {
       $("productBannerError").textContent = error.message;
     } finally {
