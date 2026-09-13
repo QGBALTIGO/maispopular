@@ -61,7 +61,27 @@ python bot.py
 | `/pedidos` | Acompanhar compras |
 | `/pedido CODIGO` | Abrir um pedido próprio |
 | `/ajuda` | Instruções |
-| `/admin` | Métricas operacionais do administrador |
+| `/admin` | Abrir painel administrativo no Web App |
+| `/darsaldo ID VALOR MOTIVO` | Creditar carteira (somente administradores) |
+
+O `/start` mostra apenas **🛒 Abrir catálogo**, **📦 Meus pedidos** e **💬 Suporte**.
+Os comandos antigos de compras e os botões de mensagens antigas encaminham ao
+Web App; não abrem mais os formulários do chat. `/saldo`, `/recarga` e `/pedidos`
+abrem as respectivas telas. O painel administrativo também fica na Carteira,
+visível somente a IDs de `ADMIN_IDS` (a API verifica a permissão a cada chamada).
+
+Exemplo: `/darsaldo 123456789 25,00 Bonificação de atendimento`. O cliente precisa
+ter aberto o bot. São aceitos créditos positivos de R$ 0,01 a R$ 5.000,00. Cada
+lançamento registra cliente, administrador, valor e motivo; reentregas do mesmo
+update do Telegram ou da mesma confirmação HTTP não duplicam o crédito.
+
+A recarga do Mini App usa Pix nativo, com QR, copia e cola, histórico, retomada
+da tentativa e consulta de confirmação. Os dados reais do pagador são exigidos
+pelo contrato da integração; não são gravados no armazenamento do navegador e
+são removidos do registro local da cobrança após a geração bem-sucedida.
+`deploy/configure_deposits.py --apply` provisiona as 17 ofertas de R$ 20 a R$ 100
+em passos de R$ 5, reaproveitando as existentes. O script altera a configuração
+de ofertas, mas não gera cobranças nem movimenta dinheiro.
 
 ## Deploy com systemd
 

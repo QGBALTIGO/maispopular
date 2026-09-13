@@ -94,9 +94,13 @@ def retail_price(provider_cost: object, multiplier: Decimal = Decimal(2)) -> Dec
 
 
 def money_brl(amount: object) -> str:
-    number = decimal_value(amount).quantize(Decimal("0.01"), rounding=ROUND_UP)
+    try:
+        signed = Decimal(str(amount))
+    except InvalidOperation:
+        raise ValueError("Foi recebido um valor monetário inválido.") from None
+    number = decimal_value(abs(signed)).quantize(Decimal("0.01"), rounding=ROUND_UP)
     digits = f"{number:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
-    return f"R$ {digits}"
+    return f"{'− ' if signed < 0 else ''}R$ {digits}"
 
 
 def money(amount: object, currency: str = "BRL") -> str:

@@ -194,12 +194,17 @@ function updateBalance(data) {
 }
 function show(id) {
   state.view = id;
+  window.storeOperations?.onView(id);
   document
     .querySelectorAll(".view")
     .forEach((el) => el.classList.toggle("hidden", el.id !== id));
   const active = ["families", "services", "order", "success"].includes(id)
     ? "platforms"
-    : id;
+    : ["deposit", "payment", "admin"].includes(id)
+      ? "wallet"
+      : id === "orderDetail"
+        ? "orders"
+        : id;
   document.querySelectorAll("[data-nav]").forEach((el) => {
     el.classList.toggle("active", el.dataset.nav === active);
     if (el.dataset.nav === active) el.setAttribute("aria-current", "page");
@@ -211,14 +216,24 @@ function show(id) {
   window.scrollTo({ top: 0, behavior: "instant" });
 }
 function goBack() {
+  if ($("operationConfirm").open) {
+    $("operationConfirm").close("no");
+    return;
+  }
   if ($("reviewModal").open) {
     if (!state.confirming) $("reviewModal").close();
     return;
   }
-  show(
-    { families: "platforms", services: "families", order: "services" }[
-      state.view
-    ] || "platforms",
+  navigate(
+    {
+      families: "platforms",
+      services: "families",
+      order: "services",
+      deposit: "wallet",
+      payment: "wallet",
+      admin: "wallet",
+      orderDetail: "orders",
+    }[state.view] || "platforms",
   );
 }
 function openBot(start = "") {
@@ -580,7 +595,7 @@ async function confirmOrder() {
       ? "Pedido em verificação"
       : "Pedido recebido";
     $("successText").textContent =
-      `Pedido ${result.id}. ${checking ? "Estamos verificando a confirmação. Não faça outro pedido para o mesmo destino." : state.service.manualDelivery ? "A entrega deste serviço é manual. Abra o atendimento no bot com o código do pedido para receber as orientações." : "Você pode acompanhar as atualizações em Meus pedidos."}`;
+      `Pedido ${result.id}. ${checking ? "Estamos verificando a confirmação. Não faça outro pedido para o mesmo destino." : state.service.manualDelivery ? "A entrega deste serviço é manual. Fale com o suporte pela aba Ajuda e informe o código do pedido." : "Você pode acompanhar as atualizações em Meus pedidos."}`;
     $("reviewModal").close();
     state.quote = null;
     show("success");
@@ -705,8 +720,8 @@ async function loadOrders(more = false) {
         element("p", "order-target", row.target),
         bottom,
       );
-      const detail = action("text-button", () => openBot(`order_${row.id}`));
-      detail.textContent = "Ver pedido no bot";
+      const detail = action("text-button", () => openOrderDetail(row.id));
+      detail.textContent = "Ver detalhes do pedido";
       card.append(detail);
       $("ordersList").append(card);
     }
@@ -739,6 +754,7 @@ async function boot() {
     renderPlatforms();
     $("app").classList.remove("hidden");
     $("bottomNav").classList.remove("hidden");
+    window.storeOperations?.boot();
     const requested = new URLSearchParams(location.search).get("platform");
     if (
       requested &&
@@ -762,7 +778,9 @@ document
   );
 document
   .querySelectorAll("[data-back]")
-  .forEach((el) => el.addEventListener("click", () => show(el.dataset.back)));
+  .forEach((el) =>
+    el.addEventListener("click", () => navigate(el.dataset.back)),
+  );
 document.querySelectorAll("[data-close-modal]").forEach((el) =>
   el.addEventListener("click", () => {
     if (!state.confirming) $("reviewModal").close();
@@ -777,8 +795,11 @@ $("serviceSearch").addEventListener("input", renderServices);
 $("serviceSort").addEventListener("change", renderServices);
 $("orderForm").addEventListener("submit", review);
 $("confirmButton").addEventListener("click", confirmOrder);
-$("depositButton").addEventListener("click", () => openBot("deposit"));
-$("modalDeposit").addEventListener("click", () => openBot("deposit"));
+$("depositButton").addEventListener("click", () => openDeposit());
+$("modalDeposit").addEventListener("click", () => {
+  $("reviewModal").close();
+  openDeposit();
+});
 $("openBotHelp").addEventListener("click", (event) => {
   if (tg?.openTelegramLink) {
     event.preventDefault();

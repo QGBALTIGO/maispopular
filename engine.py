@@ -88,13 +88,14 @@ class Panel:
                 raise
             return self.store.order(token, user_id)
 
-    async def create_payment(self, user_id: int, amount_reais: int, customer: dict) -> dict:
+    async def create_payment(self, user_id: int, amount_reais: int, customer: dict,
+                             request_id: str | None = None) -> dict:
         minimum, maximum = int(self.settings.min_deposit_brl), int(self.settings.max_deposit_brl)
         if not minimum <= amount_reais <= maximum:
             raise ValueError(f"Escolha um valor inteiro entre R$ {minimum} e R$ {maximum}.")
         if amount_reais not in self.settings.cakto_offers:
             raise ValueError("Escolha uma das opções de recarga disponíveis.")
-        row = self.store.create_payment(user_id, amount_reais * 100, customer)
+        row = self.store.create_payment(user_id, amount_reais * 100, customer, request_id)
         return await self.retry_payment(row["id"], user_id)
 
     async def retry_payment(self, token: str, user_id: int) -> dict:
@@ -121,6 +122,16 @@ class Panel:
             except PaymentError as exc:
                 self.store.payment_failed(token, "FAILED", str(exc))
             return self.store.payment(token, user_id)
+
+    def grant_credit(self, admin_id: int, user_id: int, amount: str, reason: str, request_id: str) -> dict:
+        self.require_admin(admin_id)
+        value = decimal_value(amount.replace(",", "."))
+        cents = value * 100
+        if not value.is_finite() or cents != cents.to_integral_value() or not 1 <= cents <= 500000:
+            raise ValueError("Informe de R$ 0,01 a R$ 5.000,00, com no máximo duas casas decimais.")
+        if not 3 <= len(reason.strip()) <= 160 or not request_id or len(request_id) > 100:
+            raise ValueError("Informe um motivo entre 3 e 160 caracteres.")
+        return self.store.credit_by_admin(admin_id, user_id, int(cents), reason.strip(), request_id)
 
     async def reconcile_payment(self, token: str) -> tuple[dict, bool]:
         row = self.store.payment(token)

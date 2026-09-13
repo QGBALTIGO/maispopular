@@ -94,17 +94,9 @@ async def say(update: Update, text: str, rows: list[list[Button]] | None = None)
 
 
 def home_rows(is_admin: bool = False, webapp_url: str = "") -> list[list[Button]]:
-    rows = []
-    if webapp_url:
-        rows.append([web_btn("Abrir catálogo visual", webapp_url)])
-    rows += [
-        [btn("📋 Catálogo", "catalog:0"), btn("🔎 Buscar", "search_prompt")],
-        [btn("💳 Adicionar saldo", "deposit"), btn("💳 Minha carteira", "balance")],
-        [btn("📦 Meus pedidos", "orders:0"), btn("❓ Ajuda", "help")],
-    ]
-    if is_admin:
-        rows.append([btn("⚙️ Administração", "admin")])
-    return rows
+    catalog = web_btn("🛒 Abrir catálogo", webapp_url) if webapp_url else btn("🛒 Abrir catálogo", "home")
+    orders = web_btn("📦 Meus pedidos", webapp_url + "?view=orders") if webapp_url else btn("📦 Meus pedidos", "home")
+    return [[catalog], [orders, Button("💬 Suporte", url="https://t.me/suportemaispopular")]]
 
 
 async def guard(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

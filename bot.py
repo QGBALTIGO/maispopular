@@ -26,6 +26,7 @@ from telegram.ext import (
     filters,
 )
 
+import ui_entry
 from config import Settings
 from domain import decimal_value, money_brl
 from engine import Panel
@@ -45,8 +46,8 @@ from ui_catalog import (
     service_description_page,
     service_page,
 )
-from ui_checkout import begin_order, text_input
-from ui_common import LOG, SecretFilter, btn, e, guard, panel, say, uid
+from ui_checkout import begin_order
+from ui_common import LOG, SecretFilter, btn, e, guard, panel, say, uid, web_btn
 from ui_orders import action_preview, action_result, order_page, order_text, orders_page
 from ui_payments import choose_deposit, deposit_menu, payment_page
 
@@ -227,7 +228,7 @@ async def poll_orders(context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             await context.bot.send_message(row["user_id"], "🔔 <b>Atualização do pedido</b>\n\n" + order_text(row),
                 parse_mode="HTML", link_preview_options=LinkPreviewOptions(is_disabled=True),
-                reply_markup=Keyboard([[btn("📦 Abrir", f"order:{row['id']}")]]))
+                reply_markup=Keyboard([[web_btn("📦 Meus pedidos", p.settings.webapp_url() + "?view=orders")]]) if p.settings.webapp_url() else None)
         except TelegramError:
             LOG.warning("Atualização de pedido não entregue.")
         else:
@@ -251,9 +252,8 @@ async def poll_payments(context: ContextTypes.DEFAULT_TYPE) -> None:
                       "FAILED": "❌ A recarga não foi concluída."}[updated["status"]]
             try:
                 await context.bot.send_message(updated["user_id"],
-                    f"{status}\n\n💰 Recarga: <b>{money_brl(updated['amount_cents'] / 100)}</b>\n"
-                    f"💳 Saldo atual: <b>{money_brl(p.store.balance_cents(updated['user_id']) / 100)}</b>",
-                    parse_mode="HTML", reply_markup=Keyboard([[btn("💳 Abrir carteira", "balance")]]))
+                    f"{status}\n\nConsulte sua carteira no Web App.",
+                    parse_mode="HTML", reply_markup=Keyboard([[web_btn("💳 Abrir carteira", p.settings.webapp_url() + "?view=wallet")]]) if p.settings.webapp_url() else None)
             except TelegramError:
                 LOG.warning("Atualização de pagamento não entregue.")
             else:
@@ -285,11 +285,8 @@ async def post_init(app: Application) -> None:
     await asyncio.gather(*(p.payments.validate_offer(offer_id, amount)
                            for amount, offer_id in p.settings.cakto_offers.items()))
     await app.bot.set_my_commands([
-        BotCommand("start", "Abrir a loja"), BotCommand("catalogo", "Ver redes e serviços"),
-        BotCommand("buscar", "Buscar serviço"), BotCommand("saldo", "Minha carteira"),
-        BotCommand("recarga", "Adicionar saldo via Pix"), BotCommand("pedidos", "Meus pedidos"),
-        BotCommand("pedido", "Consultar pedido"), BotCommand("cancelar", "Cancelar preenchimento"),
-        BotCommand("ajuda", "Como funciona"),
+        BotCommand("start", "Abrir a loja"), BotCommand("pedidos", "Meus pedidos"),
+        BotCommand("ajuda", "Suporte"),
     ])
     await sync_webapp_button(app)
     try:
@@ -335,14 +332,15 @@ def build_app(p: Panel) -> Application:
     app.bot_data["panel"] = p
     app.add_handler(TypeHandler(Update, guard), group=-1)
     for command, handler in [
-        ("start", start_command), ("catalogo", catalog_page), ("buscar", search_command),
-        ("saldo", balance_page), ("recarga", deposit_menu), ("pedidos", orders_page),
-        ("pedido", order_command), ("cancelar", home), ("meuid", identity),
-        ("ajuda", help_page), ("admin", admin_page), ("resolver", resolve_command),
+        ("start", ui_entry.start), ("catalogo", ui_entry.command), ("buscar", ui_entry.command),
+        ("saldo", ui_entry.command), ("recarga", ui_entry.command), ("pedidos", ui_entry.command),
+        ("pedido", ui_entry.command), ("cancelar", home), ("meuid", identity),
+        ("ajuda", ui_entry.command), ("admin", ui_entry.command), ("resolver", ui_entry.command),
+        ("darsaldo", ui_entry.grant_credit),
     ]:
         app.add_handler(CommandHandler(command, handler))
-    app.add_handler(CallbackQueryHandler(callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_input))
+    app.add_handler(CallbackQueryHandler(ui_entry.callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, home))
     app.add_error_handler(error_handler)
     if app.job_queue is None:
         raise RuntimeError("Dependência de agendamento ausente.")

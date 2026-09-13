@@ -47,6 +47,16 @@ class Store:
         );
         CREATE INDEX IF NOT EXISTS payments_user ON payments(user_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS payments_watch ON payments(status, checked_at);
+        CREATE TABLE IF NOT EXISTS payment_requests (
+            user_id INTEGER NOT NULL REFERENCES users(user_id), request_id TEXT NOT NULL,
+            payment_id TEXT NOT NULL REFERENCES payments(id), request_hash TEXT NOT NULL,
+            PRIMARY KEY(user_id, request_id)
+        );
+        CREATE TABLE IF NOT EXISTS admin_credits (
+            reference TEXT PRIMARY KEY, admin_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+            amount_cents INTEGER NOT NULL CHECK(amount_cents>0), reason TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS orders (
             id TEXT PRIMARY KEY, user_id INTEGER NOT NULL,
             service_id INTEGER NOT NULL, service_name TEXT NOT NULL,
@@ -105,15 +115,61 @@ class Store:
                             (amount_cents, now, user_id))
         return bool(inserted)
 
-    def create_payment(self, user_id: int, amount_cents: int, customer: dict) -> dict:
+    def create_payment(self, user_id: int, amount_cents: int, customer: dict,
+                       request_id: str | None = None) -> dict:
+        import hashlib
+        serialized = json.dumps(customer, ensure_ascii=False, sort_keys=True)
+        digest = hashlib.sha256(f"{amount_cents}:{serialized}".encode()).hexdigest()
         token, now = secrets.token_hex(10), int(time.time())
-        with self.db:
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            if request_id:
+                existing = self.db.execute("SELECT * FROM payment_requests WHERE user_id=? AND request_id=?",
+                                           (user_id, request_id)).fetchone()
+                if existing:
+                    if existing["request_hash"] != digest:
+                        raise ValueError("Esta tentativa já foi usada com outros dados.")
+                    self.db.commit()
+                    return self.payment(existing["payment_id"], user_id)
+                count = self.db.execute("SELECT count(*) FROM payments WHERE user_id=? AND created_at>?",
+                                        (user_id, now - 900)).fetchone()[0]
+                if count >= 5:
+                    raise ValueError("Você já gerou várias recargas. Use um Pix pendente ou aguarde 15 minutos.")
             self.db.execute("""INSERT INTO payments
                 (id,user_id,amount_cents,idempotency_key,customer_json,created_at,updated_at)
                 VALUES(?,?,?,?,?,?,?)""",
                 (token, user_id, amount_cents, str(uuid.uuid4()),
-                 json.dumps(customer, ensure_ascii=False, sort_keys=True), now, now))
+                 serialized, now, now))
+            if request_id:
+                self.db.execute("INSERT INTO payment_requests VALUES(?,?,?,?)", (user_id, request_id, token, digest))
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
+            raise
         return self.payment(token, user_id)
+
+    def credit_by_admin(self, admin_id: int, user_id: int, cents: int, reason: str, request_id: str) -> dict:
+        if not 1 <= cents <= 500000 or not reason.strip():
+            raise ValueError("Informe de R$ 0,01 a R$ 5.000,00 e um motivo.")
+        reference = f"admin:{admin_id}:{request_id}"
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            if not self.db.execute("SELECT 1 FROM wallets WHERE user_id=?", (user_id,)).fetchone():
+                raise ValueError("Usuário não encontrado. Ele precisa abrir o bot primeiro.")
+            existing = self.db.execute("SELECT * FROM admin_credits WHERE reference=?", (reference,)).fetchone()
+            if existing:
+                if (existing["user_id"], existing["amount_cents"], existing["reason"]) != (user_id, cents, reason):
+                    raise ValueError("Esta confirmação já foi usada com outros dados.")
+            else:
+                self.db.execute("INSERT INTO admin_credits VALUES(?,?,?,?,?,?)",
+                                (reference, admin_id, user_id, cents, reason, int(time.time())))
+                self._adjust_wallet(user_id, cents, "ADMIN_CREDIT", reference, f"Crédito administrativo: {reason}")
+            self.db.commit()
+            return {"userId": user_id, "amountCents": cents, "balanceCents": self.balance_cents(user_id),
+                    "repeated": bool(existing)}
+        except BaseException:
+            self.db.rollback()
+            raise
 
     def payment(self, token: str, user_id: int | None = None) -> dict | None:
         if user_id is None:
@@ -168,6 +224,9 @@ class Store:
                 raise ValueError("Pagamento não encontrado.")
             now = int(time.time())
             local = row["status"]
+            # Concurrent polling can return an older status after a refund.
+            if local == "REVERSED" and status not in {"refunded", "chargedback"} or local == "PAID" and status not in {"paid", "refunded", "chargedback"}:
+                status = row["provider_status"]
             if status == "paid":
                 changed = self._adjust_wallet(row["user_id"], row["amount_cents"], "DEPOSIT",
                                               f"payment:{token}", "Recarga Pix aprovada")

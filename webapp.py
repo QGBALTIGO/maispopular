@@ -24,6 +24,7 @@ from engine import Panel
 from payments import Cakto
 from provider import ProviderError, ServiceProvider
 from storage import Store
+from web_operations import install_operations
 
 STATIC_DIR = Path(__file__).with_name("webapp_static")
 
@@ -188,7 +189,8 @@ def create_app(panel: Panel, *, own_resources: bool = False) -> FastAPI:
             "balanceLabel": money_brl(Decimal(balance) / 100),
             "platforms": platforms,
             "serviceCount": len(services),
-            "depositOptions": sorted(panel.settings.cakto_offers),
+            "depositOptions": [a for a in sorted(panel.settings.cakto_offers) if 20 <= a <= 100 and a % 5 == 0],
+            "isAdmin": panel.is_admin(int(user["id"])),
             "botUrl": f"https://t.me/{panel.settings.bot_username}",
         }
 
@@ -249,6 +251,7 @@ def create_app(panel: Panel, *, own_resources: bool = False) -> FastAPI:
             raise HTTPException(400, str(exc)) from None
         return public_order(row, panel.store.balance_cents(int(user["id"])))
 
+    install_operations(app, panel, authenticated)
     app.mount("/assets", StaticFiles(directory=STATIC_DIR), name="assets")
     return app
 

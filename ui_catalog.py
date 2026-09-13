@@ -13,12 +13,11 @@ async def home(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     p = panel(context)
     p.store.abort_drafts(uid(update))
     context.user_data.pop("flow", None)
-    balance = p.store.balance_cents(uid(update)) / 100
     name = (update.effective_user.first_name or "cliente")[:60]
     await say(update,
         f"<b>Bem-vindo à {e(p.settings.bot_name)}, {e(name)}!</b>\n\n"
-        "Escolha uma rede social, confira os detalhes e acompanhe tudo pelo próprio bot.\n\n"
-        f"💳 <b>Seu saldo:</b> {money_brl(balance)}",
+        "Catálogo, carteira, pagamentos e pedidos em um só lugar.\n\n"
+        "Toque abaixo para abrir sua loja.",
         home_rows(p.is_admin(uid(update)), p.settings.webapp_url()))
 
 

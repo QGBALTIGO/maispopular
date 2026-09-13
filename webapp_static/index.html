@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#f7f8fa" />
     <title>Mais Popular • Sua loja digital</title>
     <link rel="icon" href="/assets/logo.jpg" />
-    <link rel="stylesheet" href="/assets/app.css?v=4" />
+    <link rel="stylesheet" href="/assets/app.css?v=5" />
     <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
     <script src="/assets/theme.js?v=4"></script>
   </head>
@@ -215,6 +215,9 @@
             <p class="greeting">Sua conta</p>
             <h1>Minha carteira</h1>
           </div>
+          <button id="adminEntry" class="secondary-button hidden">
+            ⚙️ Administração
+          </button>
           <div class="wallet-card">
             <div class="wallet-label">
               <span data-icon="wallet"></span>Saldo disponível<button
@@ -236,6 +239,179 @@
             <span class="muted">Até 30 registros</span>
           </div>
           <div id="ledgerList" class="activity-list"></div>
+          <div class="section-heading">
+            <h2>Minhas recargas</h2>
+            <button id="refreshPayments" class="text-button">Atualizar</button>
+          </div>
+          <div id="paymentList" class="service-list"></div>
+        </section>
+        <section id="deposit" class="view hidden">
+          <button class="back" data-back="wallet">← Carteira</button>
+          <div class="page-intro compact">
+            <p class="greeting">Recarregue sua carteira</p>
+            <h1>Adicionar saldo</h1>
+            <p>Escolha o valor e gere seu Pix aqui mesmo.</p>
+          </div>
+          <form id="depositForm">
+            <fieldset id="depositFields" class="plain-fieldset">
+              <legend>Valor da recarga</legend>
+              <div
+                id="depositAmounts"
+                class="deposit-amounts"
+                role="group"
+                aria-label="Valor da recarga"
+              ></div>
+              <p class="intro-copy">
+                Dados do pagador, usados somente para emitir a cobrança.
+              </p>
+              <label class="field"
+                ><span>Nome completo</span
+                ><input
+                  id="payerName"
+                  autocomplete="name"
+                  maxlength="120"
+                  required
+              /></label>
+              <label class="field"
+                ><span>E-mail</span
+                ><input
+                  id="payerEmail"
+                  type="email"
+                  autocomplete="email"
+                  maxlength="160"
+                  required
+              /></label>
+              <div class="form-columns">
+                <label class="field"
+                  ><span>Telefone com DDD</span
+                  ><input
+                    id="payerPhone"
+                    type="tel"
+                    autocomplete="tel"
+                    maxlength="25"
+                    required
+                /></label>
+                <label class="field"
+                  ><span>CPF</span
+                  ><input
+                    id="payerDocument"
+                    inputmode="numeric"
+                    maxlength="14"
+                    required
+                /></label>
+              </div>
+              <p id="depositError" class="field-error" role="alert"></p>
+              <button
+                id="generatePix"
+                class="primary-button full-button"
+                type="submit"
+              >
+                Gerar Pix de R$ 20,00
+              </button>
+              <p class="secure-caption">
+                QR Code e copia e cola aparecem nesta tela.
+              </p>
+            </fieldset>
+          </form>
+        </section>
+        <section id="payment" class="view hidden">
+          <button class="back" data-back="wallet">← Carteira</button>
+          <div class="page-intro compact">
+            <p class="greeting">Recarga da carteira</p>
+            <h1 id="paymentHeading">Seu Pix</h1>
+            <p id="paymentStatus" aria-live="polite"></p>
+          </div>
+          <div class="pix-card">
+            <strong id="paymentAmount" class="pix-amount"></strong>
+            <p id="paymentExpires" class="intro-copy"></p>
+            <div id="pixContent" class="hidden">
+              <img
+                id="pixImage"
+                class="pix-image"
+                alt="QR Code para pagar a recarga via Pix"
+              />
+              <label class="field"
+                ><span>Pix copia e cola</span
+                ><textarea id="pixCode" readonly rows="3"></textarea>
+              </label>
+              <button id="copyPix" class="primary-button full-button">
+                Copiar código Pix
+              </button>
+              <p class="secure-caption">
+                Abra seu banco e use Pix → Copia e cola.
+              </p>
+            </div>
+            <button id="refreshPix" class="secondary-button">
+              Já paguei · verificar
+            </button>
+            <button id="retryPix" class="secondary-button hidden">
+              Retomar geração do Pix
+            </button>
+            <button id="anotherPix" class="secondary-button hidden">
+              Gerar outra recarga
+            </button>
+            <p id="paymentError" class="field-error" role="alert"></p>
+          </div>
+        </section>
+        <section id="orderDetail" class="view hidden">
+          <button id="backOrders" class="back">← Meus pedidos</button>
+          <div id="orderDetailContent"></div>
+        </section>
+        <section id="admin" class="view hidden">
+          <button class="back" data-back="wallet">← Carteira</button>
+          <div class="page-intro compact">
+            <p class="greeting">Acesso restrito</p>
+            <h1>Administração</h1>
+            <p>Visão da loja, clientes e créditos.</p>
+          </div>
+          <button id="refreshAdmin" class="text-button">
+            Atualizar painel
+          </button>
+          <div id="adminStats" class="admin-stats"></div>
+          <h2 class="section-title">Clientes</h2>
+          <form id="adminSearchForm" class="search-row">
+            <label class="field"
+              ><span>Buscar por ID, nome ou @usuário</span
+              ><input id="adminSearch" maxlength="80" /></label
+            ><button class="secondary-button" type="submit">Buscar</button>
+          </form>
+          <div id="adminUsers" class="service-list"></div>
+          <h2 class="section-title">Adicionar saldo a um cliente</h2>
+          <form id="creditForm">
+            <label class="field"
+              ><span>ID do cliente</span
+              ><input
+                id="creditUser"
+                inputmode="numeric"
+                pattern="[0-9]+"
+                required
+            /></label>
+            <label class="field"
+              ><span>Valor em reais</span
+              ><input
+                id="creditAmount"
+                inputmode="decimal"
+                placeholder="25,00"
+                required
+            /></label>
+            <label class="field"
+              ><span>Motivo do crédito</span
+              ><input id="creditReason" minlength="3" maxlength="160" required
+            /></label>
+            <button
+              id="creditSubmit"
+              class="primary-button full-button"
+              type="submit"
+            >
+              Revisar crédito
+            </button>
+            <p id="creditResult" class="intro-copy" role="status"></p>
+          </form>
+          <h2 class="section-title">Pedidos para verificar</h2>
+          <div id="adminUnknown" class="service-list"></div>
+          <h2 class="section-title">Últimos créditos administrativos</h2>
+          <div id="adminCredits" class="activity-list"></div>
+          <p id="adminError" class="field-error" role="alert"></p>
         </section>
         <section id="orders" class="view hidden">
           <div class="page-intro compact">
@@ -275,9 +451,11 @@
                 Como adicionar saldo?<span data-icon="chevron"></span>
               </summary>
               <p>
-                Na Carteira, toque em Adicionar saldo com Pix. Você volta ao bot
-                para escolher um valor a partir de R$ 20 e gerar seu Pix. Após o
-                pagamento ser confirmado, atualize seu saldo.
+                Na Carteira, toque em Adicionar saldo com Pix. Escolha um valor
+                de R$ 20 a R$ 100, preencha os dados do pagador e gere a
+                cobrança. Pague pelo QR Code ou copie o código para seu banco.
+                Acompanhe a confirmação aqui, sem sair da loja para gerar o
+                pagamento.
               </p>
             </details>
             <details name="help-faq">
@@ -300,8 +478,8 @@
               </summary>
               <p>
                 A disponibilidade depende do serviço e do status do pedido.
-                Acesse Meus pedidos no bot para consultar as opções. Leia as
-                condições específicas de reposição antes de contratar.
+                Acesse Meus pedidos para consultar as opções. Leia as condições
+                específicas de reposição antes de contratar.
               </p>
             </details>
           </div>
@@ -392,6 +570,15 @@
         </button>
       </div>
     </dialog>
-    <script src="/assets/app.js?v=4" defer></script>
+    <dialog id="operationConfirm" class="modal">
+      <form method="dialog" class="modal-card">
+        <h2 id="operationTitle">Confirmar</h2>
+        <p id="operationText"></p>
+        <button value="yes" class="primary-button">Confirmar</button
+        ><button value="no" class="secondary-button" autofocus>Voltar</button>
+      </form>
+    </dialog>
+    <script src="/assets/app.js?v=5" defer></script>
+    <script src="/assets/operations.js?v=5" defer></script>
   </body>
 </html>

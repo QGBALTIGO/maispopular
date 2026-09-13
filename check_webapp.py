@@ -45,13 +45,19 @@ def main() -> None:
         account.raise_for_status()
         orders = client.get("/api/orders", headers=headers)
         orders.raise_for_status()
+        payments = client.get("/api/payments", headers=headers)
+        payments.raise_for_status()
+        admin = client.get("/api/admin", headers=headers)
+        admin.raise_for_status()
+        assert catalog.json()["depositOptions"] == list(range(20,101,5))
+        assert catalog.json()["isAdmin"] is True
         streaming = client.get("/api/catalog", params={"platform":"Streaming e Apps"}, headers=headers)
         streaming.raise_for_status()
         names = [s["displayName"] for s in streaming.json()["services"]]
         assert any("Netflix" in name for name in names)
         assert any("YouTube Premium" in name for name in names)
         assert any("Disney+" in name for name in names)
-        for path in ("/assets/app.js?v=4", "/assets/app.css?v=4", "/assets/theme.js?v=4", "/assets/logo.jpg",
+        for path in ("/assets/app.js?v=5", "/assets/app.css?v=5", "/assets/operations.js?v=5", "/assets/theme.js?v=4", "/assets/logo.jpg",
                      "/assets/brands/instagram.svg", "/assets/brands/kwai.png"):
             client.get(path).raise_for_status()
         assert "bottomNav" in page.text
@@ -67,6 +73,8 @@ def main() -> None:
                       "services": payload["serviceCount"],
                       "first_platform": payload["platforms"][0]["name"],
                       "wallet": account.status_code, "orders": orders.status_code,
+                      "payments": payments.status_code, "admin": admin.status_code,
+                      "depositAmounts": catalog.json()["depositOptions"],
                       "subscriptions": len(names), "assets": "ok"}, ensure_ascii=False))
 
 
