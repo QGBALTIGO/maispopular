@@ -67,7 +67,7 @@ async function generatePayment(event) {
   };
   const signature = JSON.stringify(payload);
   if (!paymentAttempt || paymentAttempt.signature !== signature)
-    paymentAttempt = { signature, id: crypto.randomUUID() };
+    paymentAttempt = { signature, id: requestId() };
   $("depositError").textContent = "";
   $("depositFields").disabled = true;
   $("generatePix").textContent = "Gerando seu Pix…";
@@ -561,7 +561,7 @@ $("creditForm").addEventListener("submit", async (event) => {
       return;
     const signature = JSON.stringify(payload);
     if (!creditAttempt || creditAttempt.signature !== signature)
-      creditAttempt = { signature, id: crypto.randomUUID() };
+      creditAttempt = { signature, id: requestId() };
     const result = await post("/api/admin/credits", {
       ...payload,
       request_id: creditAttempt.id,
@@ -615,7 +615,10 @@ window.storeOperations = {
     const view = new URLSearchParams(location.search).get("view");
     if (view === "deposit") openDeposit();
     else if (view === "admin") loadAdmin();
+    else if (view === "broadcastAdmin") window.loadBroadcasts?.();
+    else if (view === "raffleAdmin") window.loadRaffleAdmin?.();
     else if (view === "affiliate") loadAffiliate();
+    else if (view === "raffle") window.loadRaffle?.();
     else if (["wallet", "orders", "help"].includes(view)) navigate(view);
   },
 };

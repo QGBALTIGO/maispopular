@@ -28,6 +28,7 @@ from telegram.ext import (
 )
 
 import ui_entry
+import raffle
 from config import Settings
 from domain import decimal_value, money_brl
 from engine import Panel
@@ -52,6 +53,7 @@ from ui_common import LOG, SecretFilter, btn, e, guard, panel, say, uid, web_btn
 from ui_orders import action_preview, action_result, order_page, order_text, orders_page
 from ui_payments import choose_deposit, deposit_menu, payment_page
 from broadcasts import poll_broadcasts
+from recovery import poll_recovery
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -326,6 +328,7 @@ async def post_init(app: Application) -> None:
                            for amount, offer_id in p.settings.cakto_offers.items()))
     await app.bot.set_my_commands([
         BotCommand("start", "Abrir a loja"), BotCommand("pedidos", "Meus pedidos"),
+        BotCommand("sorteio", "Participar do jogo dos dados"),
         BotCommand("afiliados", "Indique e ganhe"), BotCommand("ajuda", "Suporte"),
     ])
     await sync_webapp_button(app)
@@ -376,9 +379,12 @@ def build_app(p: Panel) -> Application:
         ("saldo", ui_entry.command), ("recarga", ui_entry.command), ("pedidos", ui_entry.command),
         ("pedido", ui_entry.command), ("cancelar", home), ("meuid", identity),
         ("ajuda", ui_entry.command), ("admin", ui_entry.command), ("resolver", ui_entry.command),
-        ("afiliados", ui_entry.command), ("darsaldo", ui_entry.grant_credit),
+        ("afiliados", ui_entry.command), ("broadcast", ui_entry.command),
+        ("sorteio", raffle.command), ("darsaldo", ui_entry.grant_credit),
     ]:
         app.add_handler(CommandHandler(command, handler))
+    app.add_handler(CallbackQueryHandler(raffle.callback, pattern=r"^raffle:"))
+    app.add_handler(CallbackQueryHandler(recovery.callback, pattern=r"^recovery:"))
     app.add_handler(CallbackQueryHandler(ui_entry.callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, home))
     app.add_error_handler(error_handler)
@@ -393,6 +399,10 @@ def build_app(p: Panel) -> Application:
     app.job_queue.run_repeating(poll_fulfillment, interval=30, first=12,
                                 job_kwargs={"max_instances": 1, "coalesce": True})
     app.job_queue.run_repeating(poll_broadcasts, interval=2, first=3,
+                                job_kwargs={"max_instances": 1, "coalesce": True})
+    app.job_queue.run_repeating(poll_recovery, interval=30, first=20,
+                                job_kwargs={"max_instances": 1, "coalesce": True})
+    app.job_queue.run_repeating(raffle.poll_raffle, interval=15, first=8,
                                 job_kwargs={"max_instances": 1, "coalesce": True})
     return app
 

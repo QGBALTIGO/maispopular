@@ -1,8 +1,7 @@
 [Unit]
 Description=Mais Popular - Cloudflare Quick Tunnel
 After=network-online.target maispopular-webapp.service
-Wants=network-online.target
-Requires=maispopular-webapp.service
+Wants=network-online.target maispopular-webapp.service
 
 [Service]
 Type=simple

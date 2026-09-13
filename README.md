@@ -115,8 +115,9 @@ sudo -u maispopular .venv/bin/python check_webapp.py
 
 O Quick Tunnel gera um endereço HTTPS aleatório. O serviço grava a URL em
 `data/webapp_url.txt`; o bot percebe mudanças e atualiza o botão **Abrir loja** em até 15
-segundos. Esse modo acompanha o padrão dos outros bots na VPS, mas não possui SLA. Para uma
-URL permanente, substitua o Quick Tunnel por um Cloudflare Tunnel nomeado com domínio próprio.
+segundos. O túnel permanece em execução durante reinícios do bot e do WebApp, preservando o
+endereço atual. Um reinício do próprio `cloudflared` ou da VPS ainda gera outro endereço;
+para persistência inclusive nesses casos, use um Cloudflare Tunnel nomeado com domínio próprio.
 
 Não execute uma segunda cópia com o mesmo token ou banco. Para backup online, copie o banco
 usando a API de backup do SQLite ou inclua também os arquivos WAL/SHM.

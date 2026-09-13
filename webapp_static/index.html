@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="/assets/experience.css?v=9" />
     <link rel="stylesheet" href="/assets/blue-store.css?v=10" />
     <link rel="stylesheet" href="/assets/catalog-compact.css?v=16" />
+    <link rel="stylesheet" href="/assets/raffle.css?v=1" />
     <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
     <script src="/assets/theme.js?v=9"></script>
   </head>
@@ -317,6 +318,9 @@
           <button id="affiliateEntry" class="affiliate-entry full-button">
             <span data-icon="users"></span><span><strong>Indique e ganhe 15%</strong><small>Receba bônus em toda recarga dos seus indicados.</small></span><b>→</b>
           </button>
+          <button id="raffleEntry" class="raffle-entry full-button">
+            <span class="raffle-die">⚄</span><span><strong>Jogo dos dados</strong><small>Ganhe cartelas e concorra a 5 acessos de 30 dias.</small></span><b>→</b>
+          </button>
           <div class="section-heading">
             <h2>Últimas movimentações</h2>
             <span class="muted">Até 30 registros</span>
@@ -345,6 +349,24 @@
           <h2 class="section-title">Seus indicados</h2>
           <div id="affiliatePeople" class="activity-list"></div>
           <p id="affiliateError" class="field-error" role="alert"></p>
+        </section>
+        <section id="raffle" class="view hidden">
+          <button class="back" data-back="wallet">← Carteira</button>
+          <div class="raffle-hero">
+            <span class="raffle-kicker">JOGO ESPECIAL</span>
+            <h1>Seis dados.<br />Cinco vencedores.</h1>
+            <p>Receba uma cartela com seis números de 1 a 6. Cada indicação válida libera mais uma cartela completa.</p>
+            <div id="raffleCountdown" class="raffle-countdown">30/09 às 19h</div>
+          </div>
+          <div id="raffleStatus" class="raffle-status"></div>
+          <div id="raffleCards" class="raffle-cards"></div>
+          <button id="raffleJoin" class="primary-button full-button">Participar pelo bot</button>
+          <div id="raffleChannels" class="raffle-channels"></div>
+          <div class="raffle-rules">
+            <h2>Como funciona</h2>
+            <ol><li>Entre nos quatro canais e confirme no bot.</li><li>Você ganha uma cartela com 6 números.</li><li>Cada amigo confirmado pelo seu link libera outra cartela.</li><li>O bot lança 6 dados por rodada. A combinação exata vence; sem combinação exata, vale a menor distância entre as posições.</li><li>São 5 rodadas e uma pessoa só pode ganhar uma vez.</li></ol>
+          </div>
+          <p id="raffleError" class="field-error" role="alert"></p>
         </section>
         <section id="deposit" class="view hidden">
           <button class="back" data-back="wallet">← Carteira</button>
@@ -484,6 +506,9 @@
           <button id="manageBroadcasts" class="secondary-button full-button">
             Transmitir mensagem aos clientes
           </button>
+          <button id="manageRaffle" class="secondary-button full-button">
+            Acompanhar jogo dos dados
+          </button>
           <h2 class="section-title">Fila de entrega</h2>
           <p class="intro-copy">
             Pedidos pagos em processamento. Assumir a entrega manual bloqueia o
@@ -559,6 +584,15 @@
           </form>
           <div class="section-heading"><h2>Histórico</h2><button id="refreshBroadcasts" class="text-button">Atualizar</button></div>
           <div id="broadcastList" class="service-list"></div>
+        </section>
+        <section id="raffleAdmin" class="view hidden">
+          <button id="backRaffleAdmin" class="back">← Administração</button>
+          <div class="page-intro compact"><p class="eyebrow">APURAÇÃO AUTOMÁTICA</p><h1>Jogo dos dados</h1><p>Participantes, cartelas, rodadas e escolhas dos vencedores.</p></div>
+          <button id="refreshRaffleAdmin" class="text-button">Atualizar</button>
+          <div id="raffleAdminStats" class="admin-stats"></div>
+          <h2 class="section-title">Vencedores</h2>
+          <div id="raffleWinners" class="service-list"></div>
+          <p id="raffleAdminError" class="field-error" role="alert"></p>
         </section>
         <section id="productBannersAdmin" class="view hidden">
           <button id="backProductBanners" class="back">← Administração</button>
@@ -1041,14 +1075,15 @@
         </button>
       </form>
     </dialog>
-    <script src="/assets/app.js?v=15" defer></script>
-    <script src="/assets/operations.js?v=12" defer></script>
+    <script src="/assets/app.js?v=16" defer></script>
+    <script src="/assets/operations.js?v=13" defer></script>
     <script src="/assets/storefront.js?v=14" defer></script>
     <script src="/assets/prices.js?v=9" defer></script>
     <script src="/assets/blue-store.js?v=12" defer></script>
     <script src="/assets/banners-admin.js?v=11" defer></script>
     <script src="/assets/product-banners-admin.js?v=15" defer></script>
     <script src="/assets/affiliate.js?v=1" defer></script>
-    <script src="/assets/broadcast-admin.js?v=1" defer></script>
+    <script src="/assets/broadcast-admin.js?v=2" defer></script>
+    <script src="/assets/raffle.js?v=1" defer></script>
   </body>
 </html>

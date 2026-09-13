@@ -144,13 +144,76 @@ class Store:
             PRIMARY KEY(broadcast_id,user_id)
         );
         CREATE INDEX IF NOT EXISTS broadcast_pending ON broadcast_deliveries(broadcast_id,status,user_id);
+        CREATE TABLE IF NOT EXISTS interest_events (
+            id TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(user_id),
+            platform TEXT NOT NULL, service_id INTEGER NOT NULL DEFAULT 0,
+            label TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'ACTIVE',
+            created_at INTEGER NOT NULL, first_due_at INTEGER NOT NULL,
+            second_due_at INTEGER NOT NULL, first_sent_at INTEGER NOT NULL DEFAULT 0,
+            second_sent_at INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS interest_due ON interest_events(status,first_sent_at,second_sent_at,first_due_at,second_due_at);
+        CREATE UNIQUE INDEX IF NOT EXISTS interest_one_active_user ON interest_events(user_id) WHERE status='ACTIVE';
+        CREATE TABLE IF NOT EXISTS raffle_campaigns (
+            id TEXT PRIMARY KEY, title TEXT NOT NULL, prize TEXT NOT NULL,
+            status TEXT NOT NULL, scheduled_at INTEGER NOT NULL,
+            result_chat TEXT NOT NULL, draw_count INTEGER NOT NULL DEFAULT 5,
+            created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+            started_at INTEGER NOT NULL DEFAULT 0, completed_at INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS raffle_participants (
+            campaign_id TEXT NOT NULL REFERENCES raffle_campaigns(id),
+            user_id INTEGER NOT NULL REFERENCES users(user_id),
+            referrer_id INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'PENDING',
+            joined_at INTEGER NOT NULL, verified_at INTEGER NOT NULL DEFAULT 0,
+            disqualified_reason TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY(campaign_id,user_id)
+        );
+        CREATE INDEX IF NOT EXISTS raffle_referrals ON raffle_participants(campaign_id,referrer_id,status);
+        CREATE TABLE IF NOT EXISTS raffle_cards (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id TEXT NOT NULL REFERENCES raffle_campaigns(id),
+            user_id INTEGER NOT NULL REFERENCES users(user_id),
+            source TEXT NOT NULL, source_user_id INTEGER NOT NULL DEFAULT 0,
+            numbers TEXT NOT NULL, created_at INTEGER NOT NULL,
+            UNIQUE(campaign_id,user_id,source,source_user_id),
+            UNIQUE(campaign_id,numbers)
+        );
+        CREATE INDEX IF NOT EXISTS raffle_cards_user ON raffle_cards(campaign_id,user_id,id);
+        CREATE TABLE IF NOT EXISTS raffle_rolls (
+            campaign_id TEXT NOT NULL REFERENCES raffle_campaigns(id),
+            winner_position INTEGER NOT NULL, roll_position INTEGER NOT NULL,
+            value INTEGER NOT NULL CHECK(value BETWEEN 1 AND 6),
+            message_id INTEGER NOT NULL, created_at INTEGER NOT NULL,
+            PRIMARY KEY(campaign_id,winner_position,roll_position)
+        );
+        CREATE TABLE IF NOT EXISTS raffle_winners (
+            campaign_id TEXT NOT NULL REFERENCES raffle_campaigns(id),
+            position INTEGER NOT NULL, user_id INTEGER NOT NULL REFERENCES users(user_id),
+            card_id INTEGER NOT NULL REFERENCES raffle_cards(id), numbers TEXT NOT NULL,
+            dice_values TEXT NOT NULL, dice_message_ids TEXT NOT NULL,
+            distance INTEGER NOT NULL, exact_positions INTEGER NOT NULL,
+            prize_choice TEXT NOT NULL DEFAULT '', chosen_at INTEGER NOT NULL DEFAULT 0,
+            delivered_at INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL,
+            PRIMARY KEY(campaign_id,position), UNIQUE(campaign_id,user_id)
+        );
         """)
         user_columns = {row[1] for row in self.db.execute("PRAGMA table_info(users)")}
         if "referred_by" not in user_columns:
             self.db.execute("ALTER TABLE users ADD COLUMN referred_by INTEGER NOT NULL DEFAULT 0")
         if "referred_at" not in user_columns:
             self.db.execute("ALTER TABLE users ADD COLUMN referred_at INTEGER NOT NULL DEFAULT 0")
+        if "recovery_opt_out" not in user_columns:
+            self.db.execute("ALTER TABLE users ADD COLUMN recovery_opt_out INTEGER NOT NULL DEFAULT 0")
         self.db.execute("CREATE INDEX IF NOT EXISTS users_referrer ON users(referred_by,created_at)")
+        now = int(time.time())
+        self.db.execute(
+            """INSERT OR IGNORE INTO raffle_campaigns
+            (id,title,prize,status,scheduled_at,result_chat,draw_count,created_at,updated_at)
+            VALUES('set26','Sorteio Mais Popular','1 acesso por 30 dias: Crunchyroll Premium ou Netflix 4K',
+            'OPEN',1790809200,'@MaisPopular',5,?,?)""",
+            (now, now),
+        )
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(orders)")}
         if "provider_cost" not in columns:
             self.db.execute("ALTER TABLE orders ADD COLUMN provider_cost TEXT NOT NULL DEFAULT '0'")
@@ -240,6 +303,396 @@ class Store:
             "earnedCents": int(earned),
             "people": [dict(row) for row in rows],
         }
+
+    @staticmethod
+    def _raffle_numbers() -> str:
+        return ",".join(str(secrets.randbelow(6) + 1) for _ in range(6))
+
+    def _create_raffle_card(self, campaign_id: str, user_id: int, source: str,
+                            source_user_id: int = 0) -> bool:
+        now = int(time.time())
+        for _ in range(250):
+            try:
+                inserted = self.db.execute(
+                    """INSERT OR IGNORE INTO raffle_cards
+                    (campaign_id,user_id,source,source_user_id,numbers,created_at)
+                    VALUES(?,?,?,?,?,?)""",
+                    (campaign_id, user_id, source, source_user_id,
+                     self._raffle_numbers(), now),
+                ).rowcount
+            except sqlite3.IntegrityError:
+                inserted = 0
+            if inserted:
+                return True
+            existing = self.db.execute(
+                """SELECT 1 FROM raffle_cards WHERE campaign_id=? AND user_id=?
+                AND source=? AND source_user_id=?""",
+                (campaign_id, user_id, source, source_user_id),
+            ).fetchone()
+            if existing:
+                return False
+        raise RuntimeError("Não foi possível gerar uma cartela exclusiva.")
+
+    def raffle_campaign(self, campaign_id: str = "set26") -> dict:
+        row = self.db.execute(
+            "SELECT * FROM raffle_campaigns WHERE id=?", (campaign_id,)
+        ).fetchone()
+        if not row:
+            raise ValueError("Campanha não encontrada.")
+        return dict(row)
+
+    def join_raffle(self, user_id: int, referrer_id: int = 0,
+                    campaign_id: str = "set26") -> dict:
+        if referrer_id == user_id:
+            referrer_id = 0
+        now = int(time.time())
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            campaign = self.raffle_campaign(campaign_id)
+            if campaign["status"] != "OPEN" or campaign["scheduled_at"] <= now:
+                raise ValueError("As inscrições desta rodada foram encerradas.")
+            if referrer_id and not self.db.execute(
+                """SELECT 1 FROM raffle_participants WHERE campaign_id=? AND user_id=?
+                AND status='ELIGIBLE'""", (campaign_id, referrer_id)
+            ).fetchone():
+                referrer_id = 0
+            self.db.execute(
+                """INSERT OR IGNORE INTO raffle_participants
+                (campaign_id,user_id,referrer_id,status,joined_at)
+                VALUES(?,?,?,'PENDING',?)""",
+                (campaign_id, user_id, referrer_id, now),
+            )
+            self.db.commit()
+            return self.raffle_summary(user_id, campaign_id)
+        except BaseException:
+            self.db.rollback()
+            raise
+
+    def verify_raffle_participant(self, user_id: int,
+                                  campaign_id: str = "set26") -> dict:
+        now = int(time.time())
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.db.execute(
+                "SELECT * FROM raffle_participants WHERE campaign_id=? AND user_id=?",
+                (campaign_id, user_id),
+            ).fetchone()
+            if not row:
+                raise ValueError("Abra primeiro o link oficial do sorteio.")
+            campaign = self.raffle_campaign(campaign_id)
+            if campaign["status"] != "OPEN" or campaign["scheduled_at"] <= now:
+                raise ValueError("As inscrições desta rodada foram encerradas.")
+            self.db.execute(
+                """UPDATE raffle_participants SET status='ELIGIBLE',verified_at=?,
+                disqualified_reason='' WHERE campaign_id=? AND user_id=?""",
+                (now, campaign_id, user_id),
+            )
+            self._create_raffle_card(campaign_id, user_id, "BASE")
+            bonus_referrer = 0
+            referrer_id = int(row["referrer_id"])
+            if referrer_id and self.db.execute(
+                """SELECT 1 FROM raffle_participants WHERE campaign_id=? AND user_id=?
+                AND status='ELIGIBLE'""", (campaign_id, referrer_id)
+            ).fetchone():
+                if self._create_raffle_card(
+                    campaign_id, referrer_id, "REFERRAL", user_id
+                ):
+                    bonus_referrer = referrer_id
+            self.db.commit()
+            result = self.raffle_summary(user_id, campaign_id)
+            result["bonusReferrer"] = bonus_referrer
+            return result
+        except BaseException:
+            self.db.rollback()
+            raise
+
+    def raffle_summary(self, user_id: int, campaign_id: str = "set26") -> dict:
+        campaign = self.raffle_campaign(campaign_id)
+        participant = self.db.execute(
+            "SELECT * FROM raffle_participants WHERE campaign_id=? AND user_id=?",
+            (campaign_id, user_id),
+        ).fetchone()
+        cards = self.db.execute(
+            "SELECT * FROM raffle_cards WHERE campaign_id=? AND user_id=? ORDER BY id",
+            (campaign_id, user_id),
+        ).fetchall()
+        referrals = self.db.execute(
+            """SELECT count(*) FROM raffle_participants WHERE campaign_id=?
+            AND referrer_id=? AND status='ELIGIBLE'""", (campaign_id, user_id)
+        ).fetchone()[0]
+        winner = self.db.execute(
+            "SELECT * FROM raffle_winners WHERE campaign_id=? AND user_id=?",
+            (campaign_id, user_id),
+        ).fetchone()
+        return {
+            "campaign": campaign,
+            "participant": dict(participant) if participant else None,
+            "cards": [dict(row) for row in cards],
+            "referrals": int(referrals),
+            "winner": dict(winner) if winner else None,
+        }
+
+    def raffle_admin_summary(self, campaign_id: str = "set26") -> dict:
+        campaign = self.raffle_campaign(campaign_id)
+        counts = self.db.execute(
+            """SELECT count(*) participants,
+            sum(status='ELIGIBLE') eligible FROM raffle_participants WHERE campaign_id=?""",
+            (campaign_id,),
+        ).fetchone()
+        cards = self.db.execute(
+            "SELECT count(*) FROM raffle_cards WHERE campaign_id=?", (campaign_id,)
+        ).fetchone()[0]
+        winners = self.db.execute(
+            """SELECT w.*,u.display_name,u.username FROM raffle_winners w
+            JOIN users u ON u.user_id=w.user_id WHERE w.campaign_id=? ORDER BY w.position""",
+            (campaign_id,),
+        ).fetchall()
+        return {
+            "campaign": campaign,
+            "participants": int(counts["participants"] or 0),
+            "eligible": int(counts["eligible"] or 0),
+            "cards": int(cards),
+            "winners": [dict(row) for row in winners],
+        }
+
+    def due_raffle(self, now: int | None = None) -> dict | None:
+        row = self.db.execute(
+            """SELECT * FROM raffle_campaigns WHERE status IN ('OPEN','DRAWING')
+            AND scheduled_at<=? ORDER BY scheduled_at LIMIT 1""",
+            (int(time.time()) if now is None else now,),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def begin_raffle(self, campaign_id: str) -> bool:
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            campaign = self.raffle_campaign(campaign_id)
+            eligible = self.db.execute(
+                """SELECT count(*) FROM raffle_participants
+                WHERE campaign_id=? AND status='ELIGIBLE'""", (campaign_id,)
+            ).fetchone()[0]
+            if eligible < campaign["draw_count"]:
+                self.db.rollback()
+                return False
+            if campaign["status"] == "OPEN":
+                self.db.execute(
+                    "UPDATE raffle_campaigns SET status='DRAWING',started_at=?,updated_at=? WHERE id=?",
+                    (int(time.time()), int(time.time()), campaign_id),
+                )
+            self.db.commit()
+            return True
+        except BaseException:
+            self.db.rollback()
+            raise
+
+    def raffle_rolls(self, campaign_id: str, position: int) -> list[dict]:
+        return [dict(row) for row in self.db.execute(
+            """SELECT * FROM raffle_rolls WHERE campaign_id=? AND winner_position=?
+            ORDER BY roll_position""", (campaign_id, position)
+        )]
+
+    def save_raffle_roll(self, campaign_id: str, position: int, roll_position: int,
+                         value: int, message_id: int) -> None:
+        if not 1 <= value <= 6 or not 1 <= roll_position <= 6:
+            raise ValueError("Resultado do dado inválido.")
+        with self.db:
+            self.db.execute(
+                """INSERT OR IGNORE INTO raffle_rolls
+                (campaign_id,winner_position,roll_position,value,message_id,created_at)
+                VALUES(?,?,?,?,?,?)""",
+                (campaign_id, position, roll_position, value, message_id, int(time.time())),
+            )
+
+    def raffle_candidates(self, campaign_id: str, dice_values: list[int],
+                          position: int) -> list[dict]:
+        import hashlib
+
+        excluded = {int(row[0]) for row in self.db.execute(
+            "SELECT user_id FROM raffle_winners WHERE campaign_id=?", (campaign_id,)
+        )}
+        rows = self.db.execute(
+            """SELECT c.*,u.display_name,u.username FROM raffle_cards c
+            JOIN raffle_participants p ON p.campaign_id=c.campaign_id AND p.user_id=c.user_id
+            JOIN users u ON u.user_id=c.user_id
+            WHERE c.campaign_id=? AND p.status='ELIGIBLE'""", (campaign_id,)
+        ).fetchall()
+        result = []
+        for raw in rows:
+            row = dict(raw)
+            if int(row["user_id"]) in excluded:
+                continue
+            numbers = [int(value) for value in row["numbers"].split(",")]
+            row["distance"] = sum(abs(a - b) for a, b in zip(numbers, dice_values))
+            row["exact_positions"] = sum(a == b for a, b in zip(numbers, dice_values))
+            tie = f"{campaign_id}:{position}:{','.join(map(str,dice_values))}:{row['id']}"
+            row["tie"] = hashlib.sha256(tie.encode()).hexdigest()
+            result.append(row)
+        return sorted(result, key=lambda row: (
+            row["distance"], -row["exact_positions"], row["tie"]
+        ))
+
+    def disqualify_raffle_user(self, campaign_id: str, user_id: int,
+                               reason: str) -> None:
+        with self.db:
+            self.db.execute(
+                """UPDATE raffle_participants SET status='DISQUALIFIED',
+                disqualified_reason=? WHERE campaign_id=? AND user_id=?""",
+                (reason[:160], campaign_id, user_id),
+            )
+
+    def save_raffle_winner(self, campaign_id: str, position: int, candidate: dict,
+                           dice_values: list[int], message_ids: list[int]) -> bool:
+        with self.db:
+            return bool(self.db.execute(
+                """INSERT OR IGNORE INTO raffle_winners
+                (campaign_id,position,user_id,card_id,numbers,dice_values,dice_message_ids,
+                distance,exact_positions,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                (campaign_id, position, candidate["user_id"], candidate["id"],
+                 candidate["numbers"], json.dumps(dice_values), json.dumps(message_ids),
+                 candidate["distance"], candidate["exact_positions"], int(time.time())),
+            ).rowcount)
+
+    def finish_raffle(self, campaign_id: str) -> None:
+        with self.db:
+            count = self.db.execute(
+                "SELECT count(*) FROM raffle_winners WHERE campaign_id=?", (campaign_id,)
+            ).fetchone()[0]
+            campaign = self.raffle_campaign(campaign_id)
+            if count >= campaign["draw_count"]:
+                now = int(time.time())
+                self.db.execute(
+                    """UPDATE raffle_campaigns SET status='COMPLETED',completed_at=?,
+                    updated_at=? WHERE id=?""", (now, now, campaign_id)
+                )
+
+    def choose_raffle_prize(self, campaign_id: str, user_id: int,
+                            choice: str) -> dict:
+        if choice not in {"crunchyroll", "netflix"}:
+            raise ValueError("Escolha Crunchyroll Premium ou Netflix 4K.")
+        with self.db:
+            row = self.db.execute(
+                "SELECT * FROM raffle_winners WHERE campaign_id=? AND user_id=?",
+                (campaign_id, user_id),
+            ).fetchone()
+            if not row:
+                raise ValueError("Esta opção está disponível somente para vencedores.")
+            if row["prize_choice"] and row["prize_choice"] != choice:
+                raise ValueError("A escolha do prêmio já foi registrada.")
+            self.db.execute(
+                """UPDATE raffle_winners SET prize_choice=?,chosen_at=CASE WHEN chosen_at=0
+                THEN ? ELSE chosen_at END WHERE campaign_id=? AND user_id=?""",
+                (choice, int(time.time()), campaign_id, user_id),
+            )
+        return dict(self.db.execute(
+            "SELECT * FROM raffle_winners WHERE campaign_id=? AND user_id=?",
+            (campaign_id, user_id),
+        ).fetchone())
+
+    def track_interest(self, user_id: int, platform: str, label: str,
+                       service_id: int = 0, *, now: int | None = None) -> dict | None:
+        current = int(time.time()) if now is None else now
+        platform, label = platform.strip()[:80], label.strip()[:160]
+        if not platform or not label or service_id < 0:
+            raise ValueError("Interesse inválido.")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            user = self.db.execute(
+                "SELECT recovery_opt_out FROM users WHERE user_id=?", (user_id,)
+            ).fetchone()
+            if not user or user[0]:
+                self.db.rollback()
+                return None
+            active = self.db.execute(
+                "SELECT * FROM interest_events WHERE user_id=? AND status='ACTIVE'",
+                (user_id,),
+            ).fetchone()
+            if active and active["platform"] == platform and int(active["service_id"]) == service_id:
+                self.db.commit()
+                return dict(active)
+            self.db.execute(
+                "UPDATE interest_events SET status='SUPERSEDED',updated_at=? WHERE user_id=? AND status='ACTIVE'",
+                (current, user_id),
+            )
+            token = secrets.token_hex(10)
+            self.db.execute(
+                """INSERT INTO interest_events
+                (id,user_id,platform,service_id,label,status,created_at,first_due_at,
+                second_due_at,updated_at) VALUES(?,?,?,?,?,'ACTIVE',?,?,?,?)""",
+                (token, user_id, platform, service_id, label, current,
+                 current + 1800, current + 86400, current),
+            )
+            self.db.commit()
+            return dict(self.db.execute(
+                "SELECT * FROM interest_events WHERE id=?", (token,)
+            ).fetchone())
+        except BaseException:
+            self.db.rollback()
+            raise
+
+    def convert_interests(self, user_id: int, service_id: int) -> None:
+        with self.db:
+            self.db.execute(
+                """UPDATE interest_events SET status='CONVERTED',updated_at=?
+                WHERE user_id=? AND status='ACTIVE' AND (service_id=0 OR service_id=?)""",
+                (int(time.time()), user_id, service_id),
+            )
+
+    def claim_interest_notification(self, *, now: int | None = None) -> tuple[dict, int] | None:
+        current = int(time.time()) if now is None else now
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.db.execute(
+                """SELECT i.*,u.display_name,u.username FROM interest_events i
+                JOIN users u ON u.user_id=i.user_id WHERE i.status='ACTIVE' AND
+                ((i.first_sent_at=0 AND i.first_due_at<=?) OR
+                 (i.first_sent_at>0 AND i.second_sent_at=0 AND i.second_due_at<=?))
+                ORDER BY CASE WHEN i.first_sent_at=0 THEN i.first_due_at ELSE i.second_due_at END LIMIT 1""",
+                (current, current),
+            ).fetchone()
+            if not row:
+                self.db.rollback()
+                return None
+            stage = 1 if int(row["first_sent_at"]) == 0 else 2
+            column = "first_sent_at" if stage == 1 else "second_sent_at"
+            self.db.execute(
+                f"UPDATE interest_events SET {column}=-1,updated_at=? WHERE id=?",
+                (current, row["id"]),
+            )
+            self.db.commit()
+            return dict(row), stage
+        except BaseException:
+            self.db.rollback()
+            raise
+
+    def finish_interest_notification(self, token: str, stage: int, success: bool,
+                                     *, terminal: bool = False) -> None:
+        column = "first_sent_at" if stage == 1 else "second_sent_at"
+        with self.db:
+            if terminal:
+                self.db.execute(
+                    "UPDATE interest_events SET status='UNREACHABLE',updated_at=? WHERE id=?",
+                    (int(time.time()), token),
+                )
+            else:
+                self.db.execute(
+                    f"UPDATE interest_events SET {column}=?,updated_at=? WHERE id=?",
+                    (int(time.time()) if success else 0, int(time.time()), token),
+                )
+                if success and stage == 2:
+                    self.db.execute(
+                        "UPDATE interest_events SET status='COMPLETED' WHERE id=?", (token,)
+                    )
+
+    def recovery_opt_out(self, user_id: int) -> None:
+        with self.db:
+            self.db.execute(
+                "UPDATE users SET recovery_opt_out=1,updated_at=? WHERE user_id=?",
+                (int(time.time()), user_id),
+            )
+            self.db.execute(
+                "UPDATE interest_events SET status='OPTOUT',updated_at=? WHERE user_id=? AND status='ACTIVE'",
+                (int(time.time()), user_id),
+            )
 
     def ledger(self, user_id: int, limit: int = 10) -> list[dict]:
         return [dict(x) for x in self.db.execute(
@@ -522,6 +975,11 @@ class Store:
                 self.db.rollback()
                 return False
             self.db.execute("UPDATE orders SET state=?,updated_at=? WHERE id=?", ("QUEUED" if queued else "SENDING", int(time.time()), token))
+            self.db.execute(
+                """UPDATE interest_events SET status='CONVERTED',updated_at=?
+                WHERE user_id=? AND status='ACTIVE' AND (service_id=0 OR service_id=?)""",
+                (int(time.time()), user_id, row["service_id"]),
+            )
             self.db.commit()
             return True
         except BaseException:
@@ -607,6 +1065,8 @@ class Store:
             self.db.execute("UPDATE payments SET status='UNKNOWN',error='Processo interrompido ao gerar Pix' WHERE status='CREATING'")
             self.db.execute("UPDATE broadcast_deliveries SET status='FAILED',error='Envio interrompido',updated_at=? WHERE status='SENDING'", (int(time.time()),))
             self.db.execute("UPDATE broadcasts SET status='QUEUED' WHERE status='RUNNING'")
+            self.db.execute("UPDATE interest_events SET first_sent_at=0 WHERE first_sent_at=-1")
+            self.db.execute("UPDATE interest_events SET second_sent_at=0 WHERE second_sent_at=-1")
 
     def create_broadcast(self, admin_id: int, request_id: str, message: str,
                          button_text: str, button_target: str) -> dict:

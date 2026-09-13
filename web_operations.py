@@ -83,6 +83,13 @@ class BroadcastInput(BaseModel):
     confirmation: Literal["CONFIRMO"]
 
 
+class InterestInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    platform: str = Field(min_length=1, max_length=80)
+    service_id: int = Field(default=0, ge=0, le=9007199254740991)
+    label: str = Field(min_length=1, max_length=160)
+
+
 def install_operations(app, panel, authenticated):
     import banners
 
@@ -93,6 +100,67 @@ def install_operations(app, panel, authenticated):
         value = user_id(raw)
         panel.require_admin(value)
         return value
+
+    def raffle_json(user_id_value: int):
+        from raffle import CAMPAIGN_ID, REQUIRED_CHANNELS, format_numbers
+
+        data = panel.store.raffle_summary(user_id_value, CAMPAIGN_ID)
+        participant = data["participant"]
+        winner = data["winner"]
+        return {
+            "campaign": {
+                "id": data["campaign"]["id"],
+                "title": data["campaign"]["title"],
+                "prize": data["campaign"]["prize"],
+                "status": data["campaign"]["status"],
+                "scheduledAt": data["campaign"]["scheduled_at"],
+                "resultChat": data["campaign"]["result_chat"],
+            },
+            "participant": None if not participant else {
+                "status": participant["status"],
+                "reason": participant["disqualified_reason"],
+            },
+            "cards": [
+                {"id": row["id"], "numbers": format_numbers(row["numbers"]), "source": row["source"]}
+                for row in data["cards"]
+            ],
+            "referrals": data["referrals"],
+            "winner": None if not winner else {
+                "position": winner["position"],
+                "prizeChoice": winner["prize_choice"],
+            },
+            "channels": [
+                {"name": name, "url": f"https://t.me/{username[1:]}"}
+                for name, username in REQUIRED_CHANNELS
+            ],
+            "joinUrl": f"https://t.me/{panel.settings.bot_username}?start=sorteio",
+        }
+
+    @app.post("/api/interests")
+    async def create_interest(payload: InterestInput, init_data: Auth):
+        actor = user_id(init_data)
+        panel.store.track_interest(
+            actor, payload.platform, payload.label, payload.service_id
+        )
+        return {"ok": True}
+
+    @app.get("/api/raffle")
+    async def raffle_status(init_data: Auth):
+        return raffle_json(user_id(init_data))
+
+    @app.get("/api/admin/raffle")
+    async def raffle_admin(init_data: Auth):
+        from raffle import CAMPAIGN_ID
+
+        admin(init_data)
+        data = panel.store.raffle_admin_summary(CAMPAIGN_ID)
+        return {
+            "campaign": data["campaign"],
+            "participants": data["participants"],
+            "eligible": data["eligible"],
+            "cards": data["cards"],
+            "winners": data["winners"],
+        }
 
     @app.get("/api/banners")
     async def banner_list(init_data: Auth):

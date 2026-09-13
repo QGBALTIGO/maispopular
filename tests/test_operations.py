@@ -83,6 +83,30 @@ class OperationsTests(WebAppRouteTests):
                                          "button_text": "", "button_target": "catalog"}, headers=self.admin_headers)
         self.assertEqual(invalid.status_code, 400)
 
+    async def test_interest_tracking_and_raffle_views_are_private(self):
+        tracked = await self.client.post(
+            "/api/interests",
+            json={"platform": "Instagram", "service_id": 42, "label": "Seguidores"},
+            headers=self.headers,
+        )
+        self.assertEqual(tracked.status_code, 200, tracked.text)
+        row = self.store.db.execute(
+            "SELECT * FROM interest_events WHERE user_id=7 AND status='ACTIVE'"
+        ).fetchone()
+        self.assertEqual((row["service_id"], row["label"]), (42, "Seguidores"))
+        raffle = await self.client.get("/api/raffle", headers=self.headers)
+        self.assertEqual(raffle.status_code, 200)
+        self.assertEqual(len(raffle.json()["channels"]), 4)
+        self.assertTrue(raffle.json()["joinUrl"].endswith("?start=sorteio"))
+        self.assertEqual(
+            (await self.client.get("/api/admin/raffle", headers=self.headers)).status_code,
+            403,
+        )
+        self.assertEqual(
+            (await self.client.get("/api/admin/raffle", headers=self.admin_headers)).status_code,
+            200,
+        )
+
     async def test_unknown_payment_resumes_same_provider_key(self):
         self.cakto.create_pix.side_effect = PaymentUnavailable("timeout")
         response = await self.client.post("/api/payments",json=self.customer,headers=self.headers)

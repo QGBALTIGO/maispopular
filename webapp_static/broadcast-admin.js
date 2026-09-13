@@ -97,7 +97,7 @@
     if (!(await confirmOperation("Confirmar transmissão", `A mensagem será enviada para ${audience}. Confira a prévia antes de continuar.`))) return;
     const signature = JSON.stringify(payload);
     if (!attempt || attempt.signature !== signature)
-      attempt = { signature, id: crypto.randomUUID() };
+      attempt = { signature, id: requestId() };
     busy($("broadcastSubmit"), true);
     try {
       await post("/api/admin/broadcasts", { ...payload, request_id: attempt.id, confirmation: "CONFIRMO" });

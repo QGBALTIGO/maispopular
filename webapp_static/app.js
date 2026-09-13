@@ -25,6 +25,17 @@ const normalize = (value) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+function requestId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  if (window.crypto?.getRandomValues) window.crypto.getRandomValues(bytes);
+  else for (let index = 0; index < bytes.length; index += 1)
+    bytes[index] = Math.floor(Math.random() * 256);
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}
 const date = (value) =>
   new Date(value * 1000).toLocaleString("pt-BR", {
     day: "2-digit",
@@ -180,6 +191,12 @@ async function api(path, options = {}) {
     );
   return data;
 }
+function trackInterest(platform, label, serviceId = 0) {
+  api("/api/interests", {
+    method: "POST",
+    body: JSON.stringify({ platform, label, service_id: serviceId }),
+  }).catch(() => {});
+}
 function busy(button, value) {
   button.disabled = value;
   button.setAttribute("aria-busy", String(value));
@@ -200,7 +217,7 @@ function show(id) {
     .forEach((el) => el.classList.toggle("hidden", el.id !== id));
   const active = ["families", "services", "order", "success"].includes(id)
     ? "platforms"
-    : ["deposit", "payment", "admin", "affiliate", "broadcastAdmin", "bannersAdmin", "productBannersAdmin", "prices"].includes(id)
+    : ["deposit", "payment", "admin", "affiliate", "raffle", "broadcastAdmin", "raffleAdmin", "bannersAdmin", "productBannersAdmin", "prices"].includes(id)
       ? "wallet"
       : id === "orderDetail"
         ? "orders"
@@ -233,7 +250,9 @@ function goBack() {
       payment: "wallet",
       admin: "wallet",
       affiliate: "wallet",
+      raffle: "wallet",
       broadcastAdmin: "admin",
+      raffleAdmin: "admin",
       orderDetail: "orders",
     }[state.view] || "platforms",
   );
@@ -320,6 +339,17 @@ async function selectPlatform(name) {
     if (request !== state.catalogRequest) return;
     state.catalog = catalog;
     renderFamilies();
+    trackInterest(name, name);
+    const requestedService = Number(
+      new URLSearchParams(location.search).get("service"),
+    );
+    if (Number.isSafeInteger(requestedService) && requestedService > 0) {
+      const service = catalog.services.find((item) => item.id === requestedService);
+      if (service) {
+        selectFamily(service.family);
+        selectService(service);
+      }
+    }
   } catch (error) {
     if (request === state.catalogRequest)
       failure($("familyGrid"), error, () => selectPlatform(name));
@@ -479,6 +509,7 @@ function renderServices() {
 function selectService(s) {
   state.service = s;
   state.quote = null;
+  trackInterest(s.platform, s.displayName, s.id);
   $("selectedLogo").replaceChildren(logo(s.platform, s.brand));
   $("selectedBadge").textContent = `${s.platform} · ${s.id}`;
   $("selectedName").textContent = s.displayName;
@@ -829,6 +860,7 @@ function navigate(id) {
   if (id === "wallet") loadWallet();
   else if (id === "orders") loadOrders();
   else if (id === "affiliate") loadAffiliate();
+  else if (id === "raffle") window.loadRaffle?.();
   else show(id);
 }
 async function boot() {
