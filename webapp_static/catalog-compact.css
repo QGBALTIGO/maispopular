@@ -1,0 +1,130 @@
+.shop-hero {
+  margin: 16px auto 20px;
+  max-width: 780px;
+}
+.hero-slides,
+.banner-preview {
+  aspect-ratio: 16/9;
+  background: #03070e;
+  overflow: hidden;
+}
+.hero-slide {
+  height: 100%;
+  width: 100%;
+}
+.hero-slide > img,
+.banner-preview > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  aspect-ratio: auto;
+}
+.fit-contain {
+  object-fit: contain !important;
+}
+.fit-cover {
+  object-fit: cover !important;
+}
+.pos-center {
+  object-position: center;
+}
+.pos-top {
+  object-position: center top;
+}
+.pos-bottom {
+  object-position: center bottom;
+}
+.shop-product-grid,
+.platform-grid {
+  align-items: start;
+}
+.shop-product .product-copy {
+  flex: 0 0 auto;
+  gap: 0;
+  padding: 12px;
+}
+.shop-product .product-copy h3 {
+  min-height: 0;
+  margin: 0 0 6px;
+  line-height: 1.4;
+}
+.shop-product .product-copy > p {
+  min-height: 0;
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+.shop-product .product-copy .product-price {
+  margin: 0;
+  line-height: 1.2;
+}
+.shop-product .product-copy > small {
+  margin: 4px 0 8px;
+  line-height: 1.4;
+}
+.shop-product .product-copy > .social-from {
+  margin: 0 0 2px;
+  font-size: 10px;
+}
+.shop-product .product-copy .product-cta {
+  margin: 4px 0 0;
+}
+.banner-slots {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 22px;
+}
+.banner-slots button {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 8px;
+}
+.banner-slots button[aria-pressed="true"] {
+  background: var(--blue);
+  color: white;
+}
+.banner-preview {
+  width: 100%;
+  max-width: 390px;
+  border: 1px solid var(--store-border);
+  border-radius: 13px;
+  margin: 0 auto 22px;
+}
+#bannerForm input[type="file"] {
+  max-width: 100%;
+  font-size: 13px;
+  padding: 10px;
+}
+#bannerForm select {
+  max-width: 100%;
+  width: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+@media (max-width: 700px) {
+  .shop-hero {
+    margin-top: 12px;
+  }
+  .shop-product .product-copy {
+    padding: 10px;
+  }
+  .shop-product .product-copy h3 {
+    font-size: 12px;
+  }
+  .shop-product .product-copy > p {
+    font-size: 11px;
+  }
+  .shop-product .product-copy .product-price {
+    font-size: 21px;
+  }
+  .shop-product .product-copy > small {
+    font-size: 10px;
+  }
+  .shop-shortcuts {
+    margin-bottom: 15px;
+  }
+}

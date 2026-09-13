@@ -139,7 +139,9 @@ def create_app(panel: Panel, *, own_resources: bool = False) -> FastAPI:
             body_size = int(request.headers.get("content-length", "0") or 0)
         except ValueError:
             body_size = 16_385
-        if body_size > 16_384:
+        from banners import MAX_BODY
+        banner_upload = request.method == 'POST' and request.url.path in {f'/api/admin/banners/{s}' for s in (1,2,3)}
+        if body_size > (MAX_BODY if banner_upload else 16_384):
             return JSONResponse({"detail": "Requisição muito grande."}, status_code=413)
         response = await call_next(request)
         response.headers["Content-Security-Policy"] = (
@@ -184,6 +186,16 @@ def create_app(panel: Panel, *, own_resources: bool = False) -> FastAPI:
                   for name in {s.platform for s in services}}
         platforms = [{"name": name, "count": counts[name]}
                      for name in sorted(counts, key=platform_sort_key)]
+        from pricing import unit_label
+        for platform in platforms:
+            items=[s for s in services if s.platform==platform['name']]
+            quantities=[s for s in items if s.kind.casefold()!='package']
+            priced=[(panel.retail_rate(s)/(1000 if s.kind.casefold()!='package' else 1),s) for s in (quantities or items)]
+            price,cheapest=min(priced,key=lambda item:item[0])
+            families=sorted({s.family for s in items},key=family_sort_key)
+            short=[f.split(' / ')[0].split('/')[0].strip() for f in families[:3]]
+            platform.update(summary=', '.join(short)+'.',fromPriceLabel=unit_label(price),
+                            fromMinimum=cheapest.minimum,fromKind=cheapest.kind.casefold())
         balance = panel.store.balance_cents(int(user["id"]))
         return {
             "user": {"id": int(user["id"]), "firstName": str(user.get("first_name", "Cliente"))[:80],

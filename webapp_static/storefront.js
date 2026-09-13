@@ -5,7 +5,7 @@
     timer;
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
   let paused = motion.matches;
-  const slides = [
+  let slides = [
     [
       "social-blue-v2.png",
       "Impulsione suas redes sociais",
@@ -58,6 +58,10 @@
     schedule();
   }
   function carousel() {
+    $("brandHome").addEventListener("click", reloadBanners);
+    document
+      .querySelector('[data-nav="platforms"]')
+      .addEventListener("click", reloadBanners);
     $("platforms").addEventListener("click", (event) => {
       const link = event.target.closest('a[href^="#"]');
       if (!link) return;
@@ -72,38 +76,7 @@
         });
       }
     });
-    slides.forEach(([file, title, text, destination], index) => {
-      const slide = element("a", "hero-slide");
-      slide.href = destination;
-      if (destination.startsWith("https:")) {
-        slide.target = "_blank";
-        slide.rel = "noopener noreferrer";
-      }
-      const img = element("img", "");
-      img.src = `/assets/banners/${file}`;
-      img.width = 2011;
-      img.height = 782;
-      img.alt = title;
-      img.loading = index ? "lazy" : "eager";
-      img.decoding = "async";
-      if (!index) img.fetchPriority = "high";
-      const caption = element("div", "hero-caption");
-      caption.append(
-        element("strong", "", title),
-        element("span", "", text),
-        element("b", "", "Explorar ↗"),
-      );
-      slide.append(img, caption);
-      $("heroSlides").append(slide);
-      const dot = action("hero-dot", () => {
-        switchSlide(index);
-        pause(true);
-      });
-      dot.setAttribute("aria-label", `Banner ${index + 1}: ${title}`);
-      $("heroDots").append(dot);
-    });
-    switchSlide(0);
-    pause(paused);
+    reloadBanners();
     $("heroPause").addEventListener("click", () => pause(!paused));
     motion.addEventListener("change", (event) => {
       if (event.matches) pause(true);
@@ -127,6 +100,73 @@
       },
       { passive: true },
     );
+  }
+  function renderBanners() {
+    $("heroSlides").replaceChildren();
+    $("heroDots").replaceChildren();
+    slides.forEach(
+      (
+        [file, title, text, destination, fit = "contain", position = "center"],
+        index,
+      ) => {
+        const slide = element("a", "hero-slide");
+        slide.href = destination;
+        if (destination === "wallet") {
+          slide.href = "#";
+          slide.addEventListener("click", (event) => {
+            event.preventDefault();
+            loadWallet();
+          });
+        }
+        if (destination.startsWith("https:")) {
+          slide.target = "_blank";
+          slide.rel = "noopener noreferrer";
+        }
+        const img = element("img", "");
+        img.src = file.startsWith("/") ? file : `/assets/banners/${file}`;
+        img.className = `fit-${fit} pos-${position}`;
+        img.width = 2011;
+        img.height = 782;
+        img.alt = title;
+        img.loading = index ? "lazy" : "eager";
+        img.decoding = "async";
+        if (!index) img.fetchPriority = "high";
+        const caption = element("div", "hero-caption");
+        caption.append(
+          element("strong", "", title),
+          element("span", "", text),
+          element("b", "", "Explorar ↗"),
+        );
+        slide.append(img, caption);
+        $("heroSlides").append(slide);
+        const dot = action("hero-dot", () => {
+          switchSlide(index);
+          pause(true);
+        });
+        dot.setAttribute("aria-label", `Banner ${index + 1}: ${title}`);
+        $("heroDots").append(dot);
+      },
+    );
+    switchSlide(0);
+    pause(paused);
+  }
+  async function reloadBanners() {
+    try {
+      const data = await api("/api/banners");
+      slides = data.banners.map((b) => [
+        b.url,
+        b.title,
+        "",
+        b.destination,
+        b.fit,
+        b.position,
+      ]);
+    } catch (error) {
+      toast(
+        "Não foi possível atualizar os banners. Exibindo a última versão disponível.",
+      );
+    }
+    renderBanners();
   }
   const titles = {
     netflix: "Netflix",
@@ -242,14 +282,17 @@
     }
   }
   window.storefront = {
-    refresh: products,
+    reloadBanners,
+    async refresh() {
+      state.bootstrap = await api("/api/bootstrap");
+      renderPlatforms();
+      return products();
+    },
     boot() {
       if (booted) return;
       booted = true;
       carousel();
       products();
-      window.customerReviews?.load();
-      window.blueStore?.boot();
     },
   };
   if (state.bootstrap) window.storefront.boot();

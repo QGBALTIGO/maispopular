@@ -85,6 +85,12 @@ class Store:
         CREATE TABLE IF NOT EXISTS pricing_policy (
             id INTEGER PRIMARY KEY CHECK(id=1), multiplier TEXT NOT NULL DEFAULT '', revision INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS shop_banners (
+            slot INTEGER PRIMARY KEY CHECK(slot BETWEEN 1 AND 3),
+            title TEXT NOT NULL, target TEXT NOT NULL, fit TEXT NOT NULL,
+            position TEXT NOT NULL, image BLOB, mime TEXT NOT NULL DEFAULT '',
+            revision INTEGER NOT NULL, admin_id INTEGER NOT NULL, updated_at INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             order_id TEXT NOT NULL UNIQUE REFERENCES orders(id),

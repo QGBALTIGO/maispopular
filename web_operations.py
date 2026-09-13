@@ -1,5 +1,6 @@
 """Authenticated wallet, order operations and administration for the Mini App."""
 import base64
+import asyncio
 import json
 import time
 from datetime import datetime, timezone
@@ -11,7 +12,7 @@ from uuid import UUID
 import qrcode
 import reviews
 from fastapi import Header, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from domain import money_brl
@@ -71,6 +72,7 @@ class ReviewInput(BaseModel):
 
 
 def install_operations(app, panel, authenticated):
+    import banners
     def user_id(raw):
         return int(authenticated(raw)["id"])
 
@@ -78,6 +80,30 @@ def install_operations(app, panel, authenticated):
         value = user_id(raw)
         panel.require_admin(value)
         return value
+
+    @app.get('/api/banners')
+    async def banner_list(init_data: Auth):
+        user_id(init_data)
+        return {'banners':banners.listing(panel.store)}
+
+    @app.get('/media/banners/{slot}')
+    async def banner_image(slot: int):
+        row=panel.store.db.execute('SELECT image,mime FROM shop_banners WHERE slot=?',(slot,)).fetchone()
+        if not row or not row['image']:raise HTTPException(404,'Imagem não encontrada.')
+        return Response(content=row['image'],media_type=row['mime'],headers={'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'})
+
+    @app.post('/api/admin/banners/{slot}')
+    async def save_banner(slot: int, request: Request, init_data: Auth):
+        actor=admin(init_data)
+        if slot not in (1,2,3):raise HTTPException(404,'Banner não encontrado.')
+        body=bytearray()
+        async for chunk in request.stream():
+            if len(body)+len(chunk)>banners.MAX_BODY:raise HTTPException(413,'Use uma imagem de até 4 MB.')
+            body.extend(chunk)
+        try:payload=banners.BannerInput.model_validate_json(body)
+        except ValueError:raise HTTPException(422,'Confira o título, destino, enquadramento e arquivo do banner.') from None
+        data,mime=await asyncio.to_thread(banners.validate_image,payload.image)
+        return banners.save(panel.store,actor,slot,payload,data,mime)
 
     @app.exception_handler(ValueError)
     async def invalid(_: Request, exc: ValueError):

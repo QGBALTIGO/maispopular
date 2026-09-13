@@ -17,16 +17,10 @@
       navigate(button.dataset.shopNav);
     }),
   );
-  $("menuReviews").addEventListener("click", () => {
-    $("shopMenu").close();
-    show("platforms");
-    $("reviewsSection").scrollIntoView();
-  });
   $("menuAdmin").addEventListener("click", () => {
     $("shopMenu").close();
     loadAdmin();
   });
-  $("heroDeposit").addEventListener("click", () => loadWallet());
   $("shopSearch").addEventListener("click", () => {
     if (!state.bootstrap) return toast("Abra a loja pelo Telegram.");
     $("globalSearch").showModal();
@@ -89,38 +83,4 @@
       }
     }, 300);
   });
-  let booted = false;
-  function boot() {
-    if (booted) return;
-    booted = true;
-    const picks = [
-      ["Instagram", "instagram", "Redes sociais"],
-      ["Streaming e Apps", "netflix", "Streaming e apps"],
-      ["TikTok", "tiktok", "TikTok"],
-      ["Telegram", "telegram", "Telegram"],
-      ["Streaming e Apps", "hbo", "HBO Max"],
-    ];
-    for (const [platform, brand, title] of picks) {
-      if (!state.bootstrap.platforms.some((p) => p.name === platform)) continue;
-      const card = action(`floating-product floating-${brand}`, () =>
-        selectPlatform(platform),
-      );
-      if (brand === "instagram" || brand === "netflix") {
-        const img = element("img", "");
-        img.src = `/assets/banners/${brand === "instagram" ? "social-blue-v2.png" : "streaming-blue-v2.png"}`;
-        img.alt = "";
-        img.width = 1672;
-        img.height = 941;
-        card.append(img);
-      } else {
-        const art = element("div", "product-art");
-        art.append(logo(platform, brand), element("strong", "", title));
-        card.append(art);
-      }
-      card.append(element("span", "", title));
-      $("floatingProducts").append(card);
-    }
-  }
-  window.blueStore = { boot };
-  if (state.bootstrap) boot();
 })();

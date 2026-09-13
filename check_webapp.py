@@ -80,7 +80,13 @@ def main() -> None:
             client.get(path).raise_for_status()
         assert "bottomNav" in page.text
         assert 'id="heroSlides"' in page.text
-        assert 'id="reviewsSection"' in page.text
+        assert 'id="reviewsSection"' not in page.text
+        assert 'id="welcomeText"' not in page.text
+        assert 'id="manageBanners"' in page.text
+        banners=client.get('/api/banners',headers=headers)
+        banners.raise_for_status()
+        assert len(banners.json()['banners'])==3
+        for banner in banners.json()['banners']:client.get(banner['url']).raise_for_status()
         assert 'id="managePrices"' in page.text
         assert 'href="https://baltigoflix.com.br"' in page.text
         assert 'id="themeToggle"' in page.text

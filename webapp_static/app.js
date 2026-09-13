@@ -282,7 +282,17 @@ function renderPlatforms() {
     art.append(logo(platform.name), element("strong", "", platform.name));
     const copy = element("div", "product-copy");
     copy.append(
-      element("p", "", `${platform.count} serviços disponíveis`),
+      element("h3", "", platform.name),
+      element("p", "", platform.summary),
+      element("small", "social-from", "A partir de"),
+      element("strong", "product-price", platform.fromPriceLabel),
+      element(
+        "small",
+        "",
+        platform.fromKind === "package"
+          ? "por pacote"
+          : `por unidade · mín. ${number(platform.fromMinimum)}`,
+      ),
       element("span", "product-cta", "Ver categorias →"),
     );
     card.append(art, copy);
@@ -790,8 +800,6 @@ async function boot() {
   try {
     state.bootstrap = await api("/api/bootstrap");
     updateBalance(state.bootstrap);
-    $("welcomeText").textContent =
-      `Olá, ${state.bootstrap.user.firstName}. Bem-vindo!`;
     $("catalogSummary").textContent =
       `${state.bootstrap.serviceCount} serviços`;
     renderPlatforms();
