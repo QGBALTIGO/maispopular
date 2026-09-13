@@ -24,7 +24,7 @@ class ProductBannerTests(unittest.IsolatedAsyncioTestCase):
             "identity": identity(await self.panel.service(42)),
             "revision": 0,
             "image": base64.b64encode(buffer.getvalue()).decode(),
-            "fit": "cover",
+                "fit": "cover",
             "position": "top",
         } | changes
 
@@ -167,7 +167,7 @@ class ProductBannerTests(unittest.IsolatedAsyncioTestCase):
             "identity": platform_banners.identity("Instagram"),
             "revision": 0,
             "image": payload["image"],
-            "fit": "cover",
+            "fit": "contain",
             "position": "bottom",
         }
         result = await self.client.post(
@@ -176,6 +176,7 @@ class ProductBannerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status_code, 200, result.text)
         artwork = result.json()
         self.assertTrue(artwork["custom"])
+        self.assertEqual(artwork["fit"], "cover")
         self.assertEqual(artwork["position"], "bottom")
         bootstrap = (
             await self.client.get("/api/bootstrap", headers=self.headers)

@@ -42,7 +42,9 @@ def artwork(platform: str, rows):
         "identity": fingerprint,
         "revision": revision,
         "custom": custom,
-        "fit": row["fit"] if custom else "contain",
+        # Catalog artwork always fills the 16:9 card. This keeps mixed source
+        # dimensions from producing letterboxing in the social grid.
+        "fit": "cover" if custom else "contain",
         "position": row["position"] if custom else "center",
         "url": f"/media/platform-banners/{fingerprint}?v={revision}" if custom else "",
     }
@@ -65,7 +67,7 @@ def save(store, actor, platform, payload, data, mime):
         if payload.reset:
             data, mime, fit, position = None, "", "contain", "center"
         else:
-            fit, position = payload.fit, payload.position
+            fit, position = "cover", payload.position
             if data is None and row and row["identity"] == fingerprint:
                 data, mime = row["image"], row["mime"]
             if data is None:

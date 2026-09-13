@@ -20,7 +20,12 @@
     "moreProductBanners",
   ];
   function disable(value) {
-    controls.forEach((id) => ($(id).disabled = value));
+    controls.forEach(
+      (id) =>
+        ($(id).disabled =
+          value ||
+          (id === "productBannerFit" && selected?.editorType === "platform")),
+    );
   }
   function decoratedBanner() {
     return {
@@ -94,7 +99,8 @@
       item.editorType === "platform"
         ? "Redes sociais · banner geral do catálogo"
         : `${item.platform} · Cód. ${item.id}`;
-    $("productBannerFit").value = item.banner.fit;
+    $("productBannerFit").value =
+      item.editorType === "platform" ? "cover" : item.banner.fit;
     $("productBannerPosition").value = item.banner.position;
     $("productBannerError").textContent = "";
     $("productBannerForm").classList.remove("hidden");
