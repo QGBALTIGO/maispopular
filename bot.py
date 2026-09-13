@@ -29,6 +29,7 @@ from telegram.ext import (
 
 import ui_entry
 import raffle
+import recovery
 from config import Settings
 from domain import decimal_value, money_brl
 from engine import Panel

@@ -10,6 +10,23 @@ from recovery import poll_recovery
 from storage import Store
 
 
+class BotAssemblyTests(unittest.TestCase):
+    def test_application_registers_recovery_and_raffle_handlers(self):
+        from bot import build_app
+
+        panel = SimpleNamespace(
+            settings=SimpleNamespace(bot_token="123456:dummy", poll_seconds=60)
+        )
+        app = build_app(panel)
+        patterns = [
+            getattr(handler, "pattern", None)
+            for handlers in app.handlers.values()
+            for handler in handlers
+        ]
+        self.assertTrue(any(pattern and pattern.pattern == r"^raffle:" for pattern in patterns))
+        self.assertTrue(any(pattern and pattern.pattern == r"^recovery:" for pattern in patterns))
+
+
 class RaffleStorageTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
