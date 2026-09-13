@@ -58,6 +58,10 @@ def main() -> None:
         prices.raise_for_status()
         broadcasts = client.get("/api/admin/broadcasts",headers=headers)
         broadcasts.raise_for_status()
+        raffle = client.get("/api/raffle", headers=headers)
+        raffle.raise_for_status()
+        raffle_admin = client.get("/api/admin/raffle", headers=headers)
+        raffle_admin.raise_for_status()
         reviews = client.get("/api/reviews",headers=headers)
         reviews.raise_for_status()
         search = client.get("/api/search",params={"q":"Instagram"},headers=headers)
@@ -90,6 +94,9 @@ def main() -> None:
         assert 'id="manageProductBanners"' in page.text
         assert 'id="manageBroadcasts"' in page.text
         assert 'id="affiliateEntry"' in page.text
+        assert 'id="raffleEntry"' in page.text
+        assert len(raffle.json()["channels"]) == 4
+        assert raffle.json()["campaign"]["status"] in {"OPEN", "DRAWING", "COMPLETED"}
         product_banners=client.get('/api/admin/product-banners',headers=headers)
         product_banners.raise_for_status()
         assert product_banners.json()['services']
@@ -123,6 +130,7 @@ def main() -> None:
                       "depositAmounts": catalog.json()["depositOptions"],
                       "subscriptions": len(names), "fulfillment": queue.status_code,
                       "prices":prices.status_code,"broadcasts":broadcasts.status_code,"affiliate":affiliate.status_code,
+                      "raffle":raffle.status_code,"raffleAdmin":raffle_admin.status_code,
                       "reviews":reviews.status_code,"reviewCount":reviews.json()["count"],
                       "search":search.status_code,"assets": "ok"}, ensure_ascii=False))
 
