@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import sys
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -263,6 +264,44 @@ async def poll_payments(context: ContextTypes.DEFAULT_TYPE) -> None:
         await asyncio.sleep(0.05)
 
 
+async def poll_fulfillment(context: ContextTypes.DEFAULT_TYPE) -> None:
+    from fulfillment import dispatch
+    p = panel(context)
+    rows = p.store.db.execute("SELECT id FROM orders WHERE state='QUEUED' AND retry_at<=? ORDER BY created_at LIMIT 20",
+                              (int(time.time()),)).fetchall()
+    for row in rows:
+        try:
+            await dispatch(p,row["id"])
+        except (ProviderError,ValueError):
+            LOG.warning("Não foi possível processar um pedido da fila.")
+    notices = p.store.db.execute("SELECT * FROM orders WHERE state IN ('QUEUED','UNKNOWN') AND queue_notice_sent=0 LIMIT 30").fetchall()
+    for row in notices:
+        delivered = True
+        for admin_id in p.settings.admin_ids:
+            try:
+                await context.bot.send_message(admin_id,
+                    "📋 <b>Pedido aguardando atendimento</b>\n\n"
+                    f"Código: <code>{row['id']}</code>\nCliente: <code>{row['user_id']}</code>\n"
+                    f"Serviço: {e(row['service_name'])}\nMotivo interno: {e(row['queue_reason'] or row['error'] or 'Verificação necessária')}\n\n"
+                    + ("Verifique se o fornecedor recebeu o pedido antes de qualquer novo envio." if row["state"] == "UNKNOWN"
+                       else "Abra o painel para assumir a entrega manual. Assumir bloqueia o envio automático."),parse_mode="HTML",
+                    reply_markup=Keyboard([[web_btn("⚙️ Administração",p.settings.webapp_url()+"?view=admin")]]) if p.settings.webapp_url() else None)
+            except TelegramError:
+                delivered = False
+        if delivered and p.settings.admin_ids:
+            with p.store.db:
+                p.store.db.execute("UPDATE orders SET queue_notice_sent=1 WHERE id=?",(row["id"],))
+    finished = p.store.db.execute("SELECT * FROM orders WHERE state IN ('COMPLETED','REJECTED') AND provider_status<>notified_status LIMIT 30").fetchall()
+    for row in finished:
+        try:
+            await context.bot.send_message(row["user_id"],
+                f"📦 Pedido {row['id'][:8].upper()}: " + ("concluído." if row["state"]=="COMPLETED" else "cancelado, com saldo devolvido à carteira."),
+                reply_markup=Keyboard([[web_btn("📦 Meus pedidos",p.settings.webapp_url()+"?view=orders")]]) if p.settings.webapp_url() else None)
+            p.store.notified(row["id"],row["provider_status"])
+        except TelegramError:
+            LOG.warning("Não foi possível notificar a conclusão do pedido.")
+
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     error = context.error
     LOG.warning("Falha tratada (%s).", type(error).__name__)
@@ -349,6 +388,8 @@ def build_app(p: Panel) -> Application:
     app.job_queue.run_repeating(poll_payments, interval=p.settings.poll_seconds, first=10,
                                 job_kwargs={"max_instances": 1, "coalesce": True})
     app.job_queue.run_repeating(poll_webapp_button, interval=15, first=5,
+                                job_kwargs={"max_instances": 1, "coalesce": True})
+    app.job_queue.run_repeating(poll_fulfillment, interval=30, first=12,
                                 job_kwargs={"max_instances": 1, "coalesce": True})
     return app
 

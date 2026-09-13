@@ -43,9 +43,6 @@ class Panel:
                     value: str | None = None, answer: str | None = None) -> dict:
         service = await self.service(service_id, force=True)
         payload, provider_cost = build_payload(service, target, value, answer)
-        provider_balance = await self.api.balance()
-        if provider_balance["currency"] != "BRL":
-            raise ValueError("O catálogo está temporariamente indisponível para compras em reais.")
         sell_price = retail_price(provider_cost, self.settings.price_multiplier)
         if sell_price > self.settings.max_order_cost:
             raise ValueError("Este pedido ultrapassa o limite por compra. Reduza a quantidade.")
@@ -70,23 +67,10 @@ class Panel:
             if provider_cost != decimal_value(row["provider_cost"]) or sell_price != decimal_value(row["cost"]):
                 self.store.mark_order(token, "EXPIRED")
                 raise ValueError("O preço mudou. Monte um novo pedido para confirmar o valor atualizado.")
-            balance = await self.api.balance()
-            if balance["currency"] != "BRL" or decimal_value(balance["balance"]) < provider_cost:
-                raise ValueError("Este serviço está temporariamente indisponível. Tente novamente mais tarde.")
-            if not self.store.claim_order(token, user_id):
+            if not self.store.claim_order(token, user_id, queued=True):
                 raise ValueError("Confirmação já utilizada, cancelada ou expirada.")
-            try:
-                provider_id = await self.api.add(json.loads(row["payload"]))
-                self.store.mark_order(token, "SUBMITTED", provider_id=provider_id)
-            except UncertainWrite as exc:
-                self.store.mark_order(token, "UNKNOWN", error=str(exc))
-            except ProviderError as exc:
-                self.store.reject_order_and_refund(
-                    token, "Pedido recusado; saldo devolvido", str(exc))
-            except BaseException:
-                self.store.mark_order(token, "UNKNOWN", error="Falha inesperada durante o envio. O suporte verificará o pedido.")
-                raise
-            return self.store.order(token, user_id)
+            from fulfillment import dispatch
+            return await dispatch(self, token)
 
     async def create_payment(self, user_id: int, amount_reais: int, customer: dict,
                              request_id: str | None = None) -> dict:

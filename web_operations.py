@@ -44,6 +44,13 @@ class ResolveInput(BaseModel):
     confirmation: Literal["CONFIRMO"]
 
 
+class FulfillmentInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    operation: Literal["claim", "release", "complete", "refund"]
+    note: str = Field(min_length=5, max_length=300)
+    confirmation: Literal["CONFIRMO"]
+
+
 def install_operations(app, panel, authenticated):
     def user_id(raw):
         return int(authenticated(raw)["id"])
@@ -204,6 +211,21 @@ def install_operations(app, panel, authenticated):
             JOIN wallets w ON u.user_id=w.user_id WHERE CAST(u.user_id AS TEXT)=? OR u.username LIKE ?
             OR u.display_name LIKE ? ORDER BY u.updated_at DESC LIMIT 20""", (term, f"%{term}%", f"%{term}%"))
         return {"users": [dict(r) for r in rows]}
+
+    @app.get("/api/admin/fulfillment")
+    async def fulfillment_queue(init_data: Auth):
+        admin(init_data)
+        rows = panel.store.db.execute("""SELECT id,user_id,service_id,service_name,cost,provider_cost,payload,
+            target,state,queue_reason,manual_admin_id,created_at FROM orders WHERE state IN ('QUEUED','MANUAL')
+            ORDER BY created_at LIMIT 100""")
+        audit = panel.store.db.execute("SELECT * FROM fulfillment_audit ORDER BY id DESC LIMIT 30")
+        return {"orders": [dict(r) for r in rows], "audit": [dict(r) for r in audit]}
+
+    @app.post("/api/admin/fulfillment/{token}")
+    async def manual_fulfillment(token: str, payload: FulfillmentInput, init_data: Auth):
+        from fulfillment import manual_transition
+        row = manual_transition(panel,admin(init_data),token,payload.operation,payload.note)
+        return {"id": row["id"], "state": row["state"]}
 
     @app.post("/api/admin/credits")
     async def admin_credit(payload: CreditInput, init_data: Auth):

@@ -49,6 +49,8 @@ def main() -> None:
         payments.raise_for_status()
         admin = client.get("/api/admin", headers=headers)
         admin.raise_for_status()
+        queue = client.get("/api/admin/fulfillment", headers=headers)
+        queue.raise_for_status()
         assert catalog.json()["depositOptions"] == list(range(20,101,5))
         assert catalog.json()["isAdmin"] is True
         streaming = client.get("/api/catalog", params={"platform":"Streaming e Apps"}, headers=headers)
@@ -57,10 +59,14 @@ def main() -> None:
         assert any("Netflix" in name for name in names)
         assert any("YouTube Premium" in name for name in names)
         assert any("Disney+" in name for name in names)
-        for path in ("/assets/app.js?v=5", "/assets/app.css?v=5", "/assets/operations.js?v=5", "/assets/theme.js?v=4", "/assets/logo.jpg",
+        for path in ("/assets/app.js?v=6", "/assets/app.css?v=6", "/assets/operations.js?v=6", "/assets/theme.js?v=4", "/assets/logo.jpg",
+                     "/assets/storefront.js?v=6", "/assets/storefront.css?v=6", "/assets/banners/social.png",
+                     "/assets/banners/services.png", "/assets/banners/support.png",
                      "/assets/brands/instagram.svg", "/assets/brands/kwai.png"):
             client.get(path).raise_for_status()
         assert "bottomNav" in page.text
+        assert 'id="heroSlides"' in page.text
+        assert 'href="https://baltigoflix.com.br"' in page.text
         assert 'id="themeToggle"' in page.text
         assert 'name="help-faq"' in page.text
         assert 'href="https://t.me/suportemaispopular"' in page.text
@@ -75,7 +81,7 @@ def main() -> None:
                       "wallet": account.status_code, "orders": orders.status_code,
                       "payments": payments.status_code, "admin": admin.status_code,
                       "depositAmounts": catalog.json()["depositOptions"],
-                      "subscriptions": len(names), "assets": "ok"}, ensure_ascii=False))
+                      "subscriptions": len(names), "fulfillment": queue.status_code, "assets": "ok"}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

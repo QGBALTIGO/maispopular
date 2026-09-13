@@ -9,7 +9,8 @@
     <meta name="theme-color" content="#f7f8fa" />
     <title>Mais Popular • Sua loja digital</title>
     <link rel="icon" href="/assets/logo.jpg" />
-    <link rel="stylesheet" href="/assets/app.css?v=5" />
+    <link rel="stylesheet" href="/assets/app.css?v=6" />
+    <link rel="stylesheet" href="/assets/storefront.css?v=6" />
     <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
     <script src="/assets/theme.js?v=4"></script>
   </head>
@@ -81,17 +82,76 @@
       </section>
       <div id="app" class="hidden">
         <section id="platforms" class="view">
+          <section
+            class="shop-hero"
+            aria-label="Destaques da loja"
+            aria-roledescription="carrossel"
+          >
+            <div id="heroSlides" class="hero-slides"></div>
+            <div class="hero-controls">
+              <div id="heroDots" class="hero-dots"></div>
+              <button id="heroPause" type="button" aria-label="Pausar banners">
+                Pausar
+              </button>
+            </div>
+          </section>
           <div class="page-intro">
             <p id="welcomeText" class="greeting">Bem-vindo à Mais Popular</p>
-            <h1>O que você procura?</h1>
-            <p>Escolha uma rede. Encontre o serviço certo.</p>
+            <h1>
+              Seu próximo upgrade<br /><span class="accent-text"
+                >começa aqui.</span
+              >
+            </h1>
+            <p>
+              Redes sociais, assinaturas e ferramentas. Tudo na sua loja
+              digital.
+            </p>
           </div>
-          <div class="section-heading">
+          <nav class="shop-shortcuts" aria-label="Seções da loja">
+            <a href="#socialSection">Redes sociais</a
+            ><a href="#streamingSection">Streaming</a
+            ><a href="#toolsSection">Ferramentas</a>
+          </nav>
+          <div class="section-heading" id="socialSection">
             <h2>Redes sociais</h2>
             <span id="catalogSummary" class="muted"></span>
           </div>
           <div id="platformGrid" class="platform-grid"></div>
           <div id="subscriptionEntry"></div>
+          <section id="streamingSection" class="shop-section">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">PLAY NO SEU DIA</p>
+                <h2>Streaming e assinaturas</h2>
+              </div>
+            </div>
+            <div id="streamingProducts" class="shop-product-grid"></div>
+          </section>
+          <a
+            class="baltigo-card"
+            href="https://baltigoflix.com.br"
+            target="_blank"
+            rel="noopener noreferrer"
+            ><div class="baltigo-symbol" aria-hidden="true">
+              B<span>▶</span>
+            </div>
+            <div>
+              <p class="eyebrow">CONHEÇA TAMBÉM</p>
+              <h2>BaltigoFlix</h2>
+              <p>Seu próximo play tem endereço certo.</p>
+              <span class="baltigo-cta">Conhecer a BaltigoFlix ↗</span
+              ><small>Abre baltigoflix.com.br · contratação no site</small>
+            </div></a
+          >
+          <section id="toolsSection" class="shop-section">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">MAIS POSSIBILIDADES</p>
+                <h2>Criação, estudos e apps</h2>
+              </div>
+            </div>
+            <div id="toolProducts" class="shop-product-grid"></div>
+          </section>
           <div class="reassurance">
             <span data-icon="shield"></span>
             <p>
@@ -368,6 +428,16 @@
             Atualizar painel
           </button>
           <div id="adminStats" class="admin-stats"></div>
+          <h2 class="section-title">Fila de entrega</h2>
+          <p class="intro-copy">
+            Pedidos pagos em processamento. Assumir a entrega manual bloqueia o
+            envio automático. Conclua somente depois de entregar.
+          </p>
+          <div id="adminFulfillment" class="service-list"></div>
+          <details class="description">
+            <summary>Histórico de atendimento</summary>
+            <div id="fulfillmentAudit" class="activity-list"></div>
+          </details>
           <h2 class="section-title">Clientes</h2>
           <form id="adminSearchForm" class="search-row">
             <label class="field"
@@ -562,7 +632,7 @@
         </dl>
         <p id="reviewWarning" class="notice hidden"></p>
         <button id="confirmButton" class="primary-button">
-          Confirmar e enviar</button
+          Confirmar pedido</button
         ><button id="modalDeposit" class="primary-button hidden">
           Adicionar saldo</button
         ><button data-close-modal class="text-button full-width">
@@ -578,7 +648,8 @@
         ><button value="no" class="secondary-button" autofocus>Voltar</button>
       </form>
     </dialog>
-    <script src="/assets/app.js?v=5" defer></script>
-    <script src="/assets/operations.js?v=5" defer></script>
+    <script src="/assets/app.js?v=6" defer></script>
+    <script src="/assets/operations.js?v=6" defer></script>
+    <script src="/assets/storefront.js?v=6" defer></script>
   </body>
 </html>

@@ -41,7 +41,7 @@ if __name__ == "__main__":
         store = Store(path)
         provider = AsyncMock(spec=ServiceProvider)
         provider.services.return_value = services
-        provider.balance.return_value = {"balance": "1000", "currency": "BRL"}
+        provider.balance.return_value = {"balance": "0", "currency": "BRL"}
         provider.add.side_effect = AssertionError("Visual preview cannot send orders")
         config = replace(settings(path), admin_ids=frozenset({7}), max_deposit_brl=Decimal(100),
                          cakto_offers={v: f"offer-{v}" for v in range(20,101,5)})
@@ -57,7 +57,9 @@ if __name__ == "__main__":
         payments.order.side_effect = check_pix
         store.register_user(7, "ana", "Ana Cliente")
         store.register_user(8, "cliente", "Cliente de QA")
-        app = create_app(Panel(config, provider, payments, store))
+        panel = Panel(config, provider, payments, store)
+        panel.grant_credit(7,7,"100","Saldo fictício de QA","preview-wallet")
+        app = create_app(panel)
         print("Preview uses test auth and isolated wallet; no live orders.", flush=True)
         # Publicly-known test token, not a production credential.
         print("TEST_INIT=" + signed_init(), flush=True)

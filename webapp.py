@@ -111,7 +111,7 @@ def public_order(row: dict, balance_cents: int) -> dict:
         "cost": row["cost"], "costLabel": money_brl(row["cost"]),
         "balance": f"{Decimal(balance_cents) / 100:.2f}",
         "balanceLabel": money_brl(Decimal(balance_cents) / 100),
-        "error": row.get("error", ""),
+        "error": "A equipe está verificando o pedido." if row["state"] == "UNKNOWN" else "",
     }
 
 

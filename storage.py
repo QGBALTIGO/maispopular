@@ -78,10 +78,19 @@ class Store:
             error TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS actions_order ON actions(order_id, created_at DESC);
+        CREATE TABLE IF NOT EXISTS fulfillment_audit (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL REFERENCES orders(id),
+            actor_id INTEGER NOT NULL, event TEXT NOT NULL, note TEXT NOT NULL, created_at INTEGER NOT NULL
+        );
         """)
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(orders)")}
         if "provider_cost" not in columns:
             self.db.execute("ALTER TABLE orders ADD COLUMN provider_cost TEXT NOT NULL DEFAULT '0'")
+        for name, definition in {"retry_at": "INTEGER NOT NULL DEFAULT 0", "queue_reason": "TEXT NOT NULL DEFAULT ''",
+                                 "queue_notice_sent": "INTEGER NOT NULL DEFAULT 0", "manual_admin_id": "INTEGER NOT NULL DEFAULT 0"}.items():
+            if name not in columns:
+                self.db.execute(f"ALTER TABLE orders ADD COLUMN {name} {definition}")
+        self.db.execute("CREATE INDEX IF NOT EXISTS orders_queue ON orders(state,retry_at,created_at)")
         self.db.commit()
 
     def close(self) -> None:
@@ -312,7 +321,7 @@ class Store:
             cents = int((Decimal(row["cost"]) * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
             changed = self._adjust_wallet(row["user_id"], cents, "ORDER_REFUND",
                                           f"refund:{token}", reason)
-            self.db.execute("""UPDATE orders SET state='REJECTED',error=?,updated_at=?
+            self.db.execute("""UPDATE orders SET state='REJECTED',provider_status='canceled',error=?,updated_at=?
                 WHERE id=?""", (error[:500], int(time.time()), token))
             self.db.commit()
             return changed
@@ -325,7 +334,7 @@ class Store:
             self.db.execute("UPDATE orders SET state='ABORTED' WHERE user_id=? AND state='DRAFT'", (user_id,))
             self.db.execute("UPDATE actions SET state='ABORTED' WHERE user_id=? AND state='DRAFT'", (user_id,))
 
-    def claim_order(self, token: str, user_id: int) -> bool:
+    def claim_order(self, token: str, user_id: int, *, queued: bool = False) -> bool:
         self.db.execute("BEGIN IMMEDIATE")
         try:
             row = self.order(token, user_id)
@@ -334,7 +343,7 @@ class Store:
                 return False
             placeholders = ",".join("?" for _ in TERMINAL)
             duplicate = self.db.execute(f"""SELECT id FROM orders WHERE id<>? AND service_id=? AND target=?
-                AND (state IN ('SENDING','UNKNOWN') OR (state='SUBMITTED' AND lower(provider_status) NOT IN ({placeholders})))
+                AND (state IN ('QUEUED','MANUAL','SENDING','UNKNOWN') OR (state='SUBMITTED' AND lower(provider_status) NOT IN ({placeholders})))
                 LIMIT 1""", (token, row["service_id"], row["target"], *TERMINAL)).fetchone()
             if duplicate:
                 raise ValueError("Já existe um pedido ativo desse serviço para o mesmo destino.")
@@ -344,7 +353,7 @@ class Store:
             if not self._adjust_wallet(user_id, -cents, "ORDER", f"order:{token}", row["service_name"]):
                 self.db.rollback()
                 return False
-            self.db.execute("UPDATE orders SET state='SENDING',updated_at=? WHERE id=?", (int(time.time()), token))
+            self.db.execute("UPDATE orders SET state=?,updated_at=? WHERE id=?", ("QUEUED" if queued else "SENDING", int(time.time()), token))
             self.db.commit()
             return True
         except BaseException:

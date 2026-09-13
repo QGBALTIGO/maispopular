@@ -351,7 +351,7 @@ async function loadAdmin() {
         return card;
       }),
     );
-    await loadAdminUsers();
+    await Promise.all([loadAdminUsers(), loadFulfillment()]);
     $("adminCredits").replaceChildren(
       ...data.credits.map((row) => {
         const card = element("div", "activity-row credit-audit");
@@ -426,6 +426,113 @@ async function loadAdmin() {
   } finally {
     busy($("refreshAdmin"), false);
   }
+}
+
+async function loadFulfillment() {
+  const data = await api("/api/admin/fulfillment");
+  $("adminFulfillment").replaceChildren(
+    ...data.orders.map((row) => {
+      const card = element("article", "service-card fulfillment-card");
+      const payload = JSON.parse(row.payload);
+      card.append(
+        element(
+          "p",
+          "eyebrow",
+          row.state === "MANUAL"
+            ? `EM ATENDIMENTO · ADMIN ${row.manual_admin_id}`
+            : "NA FILA AUTOMÁTICA",
+        ),
+        element("h3", "", row.service_name),
+        element(
+          "p",
+          "intro-copy",
+          `#${row.id} · Cliente ${row.user_id} · ${date(row.created_at)}`,
+        ),
+        element("p", "order-target", row.target),
+        element(
+          "p",
+          "intro-copy",
+          `Quantidade: ${payload.quantity ?? "Pacote"} · Pago: ${formatMoney(Number(row.cost))} · Custo operacional: ${formatMoney(Number(row.provider_cost))}`,
+        ),
+        element("p", "notice", row.queue_reason || "Aguardando envio."),
+      );
+      if (payload.comments)
+        card.append(element("p", "order-target", payload.comments));
+      const label = element(
+        "label",
+        "field",
+        "Observação / referência da entrega",
+      );
+      const note = element("textarea", "");
+      note.minLength = 5;
+      note.maxLength = 300;
+      note.rows = 2;
+      label.append(note);
+      card.append(label);
+      const actions =
+        row.state === "MANUAL"
+          ? [
+              ["complete", "Concluir entrega"],
+              ["release", "Devolver à fila automática"],
+              ["refund", "Cancelar e devolver saldo"],
+            ]
+          : [
+              ["claim", "Assumir entrega manual"],
+              ["refund", "Cancelar e devolver saldo"],
+            ];
+      const controls = element("div", "fulfillment-actions");
+      for (const [operation, title] of actions) {
+        const button = action("secondary-button", async () => {
+          if (note.value.trim().length < 5) {
+            note.focus();
+            return toast(
+              "Registre uma observação com pelo menos 5 caracteres.",
+            );
+          }
+          const warnings = {
+            claim:
+              "O envio automático será bloqueado. Faça a entrega somente depois de confirmar que o pedido foi assumido.",
+            release:
+              "Devolva somente se NÃO tiver realizado a entrega fora do sistema. O envio automático poderá ocorrer assim que houver saldo.",
+            complete:
+              "Confirme somente se a entrega já foi realizada. O cliente será avisado da conclusão.",
+            refund:
+              "O pedido será cancelado e o valor voltará à carteira do cliente. Confirme que não houve entrega externa.",
+          };
+          busy(button, true);
+          try {
+            if (!(await confirmOperation(title, warnings[operation]))) return;
+            await post(`/api/admin/fulfillment/${row.id}`, {
+              operation,
+              note: note.value.trim(),
+              confirmation: "CONFIRMO",
+            });
+            toast("Atendimento atualizado.");
+            await loadAdmin();
+          } catch (error) {
+            toast(error.message);
+          } finally {
+            busy(button, false);
+          }
+        });
+        button.textContent = title;
+        controls.append(button);
+      }
+      card.append(controls);
+      return card;
+    }),
+  );
+  if (!data.orders.length)
+    empty($("adminFulfillment"), "Nenhum pedido na fila de entrega.");
+  $("fulfillmentAudit").replaceChildren(
+    ...data.audit.map((row) =>
+      element(
+        "p",
+        "intro-copy",
+        `${date(row.created_at)} · Admin ${row.actor_id} · #${row.order_id} · ${{ claim: "Assumido", release: "Devolvido à fila", complete: "Entregue", refund: "Cancelado e reembolsado" }[row.event]}: ${row.note}`,
+      ),
+    ),
+  );
 }
 
 $("creditForm").addEventListener("submit", async (event) => {

@@ -15,6 +15,7 @@ from engine import Panel
 LOG = logging.getLogger("maispopular_bot")
 PAGE = 8
 LOCAL_STATES = {
+    "QUEUED": "⏳ Em processamento", "MANUAL": "⏳ Em processamento", "COMPLETED": "✅ Concluído",
     "DRAFT": "📝 Aguardando confirmação", "SENDING": "📤 Enviando",
     "SUBMITTED": "📦 Pedido recebido", "UNKNOWN": "⚠️ Em verificação",
     "REJECTED": "❌ Não realizado", "EXPIRED": "⌛ Orçamento expirado",

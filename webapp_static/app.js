@@ -557,11 +557,8 @@ async function review(event) {
       ? `Adicione pelo menos ${formatMoney(-after / 100)} ao saldo para este pedido. As recargas começam em R$ 20.`
       : state.service.manualDelivery
         ? "Este serviço tem entrega manual. O acesso não é liberado automaticamente ao confirmar."
-        : "";
-    $("reviewWarning").classList.toggle(
-      "hidden",
-      !insufficient && !state.service.manualDelivery,
-    );
+        : "O pedido entra em processamento após a confirmação. Consulte o prazo e as condições na descrição do serviço.";
+    $("reviewWarning").classList.toggle("hidden", false);
     $("confirmButton").classList.toggle("hidden", insufficient);
     $("modalDeposit").classList.toggle("hidden", !insufficient);
     $("confirmButton").disabled = insufficient;
@@ -586,16 +583,28 @@ async function confirmOrder() {
       body: "{}",
     });
     updateBalance(result);
-    if (!["SUBMITTED", "UNKNOWN", "SENDING"].includes(result.state))
+    if (
+      ![
+        "SUBMITTED",
+        "UNKNOWN",
+        "SENDING",
+        "QUEUED",
+        "MANUAL",
+        "COMPLETED",
+      ].includes(result.state)
+    )
       throw new Error(
         "Não foi possível enviar este pedido. Confira o saldo e os dados antes de tentar novamente.",
       );
-    const checking = result.state !== "SUBMITTED";
-    $("successTitle").textContent = checking
-      ? "Pedido em verificação"
-      : "Pedido recebido";
+    const checking = result.state === "UNKNOWN";
+    $("successTitle").textContent =
+      result.state === "COMPLETED"
+        ? "Pedido concluído"
+        : checking
+          ? "Pedido em verificação"
+          : "Pedido recebido";
     $("successText").textContent =
-      `Pedido ${result.id}. ${checking ? "Estamos verificando a confirmação. Não faça outro pedido para o mesmo destino." : state.service.manualDelivery ? "A entrega deste serviço é manual. Fale com o suporte pela aba Ajuda e informe o código do pedido." : "Você pode acompanhar as atualizações em Meus pedidos."}`;
+      `Pedido ${result.id}. ${result.state === "COMPLETED" ? "A entrega foi concluída. Consulte os detalhes em Meus pedidos." : checking ? "Estamos verificando a confirmação. Não faça outro pedido para o mesmo destino." : "Seu pedido está em processamento. A entrega segue o prazo e as condições da descrição. Acompanhe as atualizações em Meus pedidos."}`;
     $("reviewModal").close();
     state.quote = null;
     show("success");
@@ -664,6 +673,9 @@ function statusLabel(row) {
     awaiting: "Aguardando atualização",
   };
   const local = {
+    QUEUED: "Em processamento",
+    MANUAL: "Em processamento",
+    COMPLETED: "Concluído",
     SENDING: "Enviando",
     UNKNOWN: "Em verificação",
     REJECTED: "Não realizado",
@@ -755,6 +767,7 @@ async function boot() {
     $("app").classList.remove("hidden");
     $("bottomNav").classList.remove("hidden");
     window.storeOperations?.boot();
+    window.storefront?.boot();
     const requested = new URLSearchParams(location.search).get("platform");
     if (
       requested &&
