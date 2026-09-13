@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/assets/storefront.css?v=6" />
     <link rel="stylesheet" href="/assets/experience.css?v=9" />
     <link rel="stylesheet" href="/assets/blue-store.css?v=10" />
-    <link rel="stylesheet" href="/assets/catalog-compact.css?v=12" />
+    <link rel="stylesheet" href="/assets/catalog-compact.css?v=13" />
     <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
     <script src="/assets/theme.js?v=9"></script>
   </head>
@@ -451,6 +451,12 @@
           <button id="managePrices" class="primary-button full-button">
             Gerenciar preços do catálogo
           </button>
+          <button
+            id="manageProductBanners"
+            class="secondary-button full-button"
+          >
+            Banners dos produtos
+          </button>
           <button id="manageBanners" class="secondary-button full-button">
             Gerenciar banners da loja
           </button>
@@ -508,6 +514,95 @@
           <h2 class="section-title">Últimos créditos administrativos</h2>
           <div id="adminCredits" class="activity-list"></div>
           <p id="adminError" class="field-error" role="alert"></p>
+        </section>
+        <section id="productBannersAdmin" class="view hidden">
+          <button id="backProductBanners" class="back">← Administração</button>
+          <div class="page-intro compact">
+            <p class="eyebrow">IMAGENS DOS CARDS</p>
+            <h1>Banners dos produtos</h1>
+            <p>
+              Escolha um produto e personalize sua imagem. Os preços, detalhes e
+              banners do início não serão alterados.
+            </p>
+          </div>
+          <label class="field"
+            ><span>Buscar produto</span
+            ><input
+              id="productBannerSearch"
+              type="search"
+              placeholder="Brainly, Qconcursos ou código"
+              maxlength="100"
+          /></label>
+          <label class="field"
+            ><span>Categoria</span
+            ><select id="productBannerPlatform"></select
+          ></label>
+          <p id="productBannerCount" class="muted" aria-live="polite"></p>
+          <div id="productBannerList" class="product-banner-list"></div>
+          <button
+            id="moreProductBanners"
+            class="secondary-button full-button hidden"
+          >
+            Mostrar mais
+          </button>
+          <form id="productBannerForm" class="hidden">
+            <h2 id="productBannerName"></h2>
+            <p id="productBannerCode" class="muted"></p>
+            <label class="field"
+              ><span>Imagem do produto</span
+              ><input
+                id="productBannerFile"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+              /><small
+                >PNG, JPG ou WebP, até 4 MB. Recomendado: 1600 × 900 (16:9). A
+                imagem substitui toda a arte do card.</small
+              ></label
+            >
+            <p class="eyebrow">PRÉVIA DO CARD</p>
+            <div
+              id="productBannerPreview"
+              class="shop-product product-banner-preview"
+            ></div>
+            <div class="form-columns">
+              <label class="field"
+                ><span>Ajuste da imagem</span
+                ><select id="productBannerFit">
+                  <option value="contain">Mostrar inteira (sem cortes)</option>
+                  <option value="cover">Preencher (pode cortar bordas)</option>
+                </select></label
+              >
+              <label class="field"
+                ><span>Enquadramento</span
+                ><select id="productBannerPosition">
+                  <option value="center">Centro</option>
+                  <option value="top">Topo</option>
+                  <option value="bottom">Parte de baixo</option>
+                </select></label
+              >
+            </div>
+            <button
+              id="saveProductBanner"
+              type="submit"
+              class="primary-button full-button"
+            >
+              Publicar imagem do produto
+            </button>
+            <button
+              id="restoreProductBanner"
+              type="button"
+              class="secondary-button full-button"
+            >
+              Restaurar arte original
+            </button>
+          </form>
+          <p id="productBannerError" class="field-error" role="alert"></p>
+          <button
+            id="refreshProductBanners"
+            class="secondary-button full-button"
+          >
+            Atualizar produtos
+          </button>
         </section>
         <section id="bannersAdmin" class="view hidden">
           <button id="backBannerAdmin" class="back">← Administração</button>
@@ -900,11 +995,12 @@
         </button>
       </form>
     </dialog>
-    <script src="/assets/app.js?v=11" defer></script>
+    <script src="/assets/app.js?v=13" defer></script>
     <script src="/assets/operations.js?v=11" defer></script>
-    <script src="/assets/storefront.js?v=11" defer></script>
+    <script src="/assets/storefront.js?v=13" defer></script>
     <script src="/assets/prices.js?v=9" defer></script>
     <script src="/assets/blue-store.js?v=11" defer></script>
     <script src="/assets/banners-admin.js?v=11" defer></script>
+    <script src="/assets/product-banners-admin.js?v=13" defer></script>
   </body>
 </html>

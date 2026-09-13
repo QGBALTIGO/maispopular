@@ -91,6 +91,12 @@ class Store:
             position TEXT NOT NULL, image BLOB, mime TEXT NOT NULL DEFAULT '',
             revision INTEGER NOT NULL, admin_id INTEGER NOT NULL, updated_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS product_banners (
+            service_id INTEGER PRIMARY KEY, identity TEXT NOT NULL,
+            fit TEXT NOT NULL, position TEXT NOT NULL, image BLOB,
+            mime TEXT NOT NULL DEFAULT '', revision INTEGER NOT NULL,
+            admin_id INTEGER NOT NULL, updated_at INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             order_id TEXT NOT NULL UNIQUE REFERENCES orders(id),

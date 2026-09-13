@@ -240,11 +240,12 @@
             selectService(service);
           },
         );
-        const art = element("div", "product-art");
-        art.append(
-          logo(service.platform, service.brand),
-          element("strong", "", titles[service.brand] || service.displayName),
-        );
+        const art = customProductArt(service) || element("div", "product-art");
+        if (!service.banner?.custom)
+          art.append(
+            logo(service.platform, service.brand),
+            element("strong", "", titles[service.brand] || service.displayName),
+          );
         const body = element("div", "product-copy");
         body.append(
           element("h3", "", service.displayName),

@@ -382,6 +382,30 @@ function renderCategoryTabs() {
     }),
   );
 }
+function customProductArt(service) {
+  if (!service.banner?.custom) return null;
+  const art = element("div", "product-art custom-product-art");
+  const image = element(
+    "img",
+    `fit-${service.banner.fit} pos-${service.banner.position}`,
+  );
+  image.src = service.banner.url;
+  image.alt = service.displayName;
+  image.loading = "lazy";
+  image.addEventListener(
+    "error",
+    () => {
+      art.classList.remove("custom-product-art");
+      art.replaceChildren(
+        logo(service.platform, service.brand),
+        element("strong", "", service.displayName),
+      );
+    },
+    { once: true },
+  );
+  art.append(image);
+  return art;
+}
 function renderServices() {
   const search = normalize($("serviceSearch").value);
   let rows = state.catalog.services.filter(
@@ -409,6 +433,8 @@ function renderServices() {
   }
   for (const s of rows) {
     const card = action("service-card", () => selectService(s));
+    const banner = customProductArt(s);
+    if (banner) card.append(banner);
     const top = element("div", "service-top");
     top.append(
       logo(s.platform, s.brand),

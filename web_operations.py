@@ -11,6 +11,7 @@ from uuid import UUID
 
 import qrcode
 import reviews
+import product_banners
 from fastapi import Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
@@ -104,6 +105,32 @@ def install_operations(app, panel, authenticated):
         except ValueError:raise HTTPException(422,'Confira o título, destino, enquadramento e arquivo do banner.') from None
         data,mime=await asyncio.to_thread(banners.validate_image,payload.image)
         return banners.save(panel.store,actor,slot,payload,data,mime)
+
+    @app.get('/api/admin/product-banners')
+    async def product_banner_list(init_data: Auth):
+        from webapp import service_json
+        admin(init_data)
+        rows = product_banners.metadata(panel.store)
+        return {'services': [service_json(s, panel.settings.price_multiplier, panel.retail_rate(s), rows) for s in await panel.catalog()]}
+
+    @app.get('/media/product-banners/{service_id}')
+    async def product_banner_image(service_id: int, key: str, v: int):
+        row = panel.store.db.execute('SELECT image,mime FROM product_banners WHERE service_id=? AND identity=? AND revision=?', (service_id,key,v)).fetchone()
+        if not row or not row['image']:raise HTTPException(404,'Imagem não encontrada.')
+        return Response(content=row['image'],media_type=row['mime'],headers={'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'})
+
+    @app.post('/api/admin/product-banners/{service_id}')
+    async def save_product_banner(service_id: int, request: Request, init_data: Auth):
+        actor = admin(init_data)
+        body = bytearray()
+        async for chunk in request.stream():
+            if len(body)+len(chunk)>banners.MAX_BODY:raise HTTPException(413,'Use uma imagem de até 4 MB.')
+            body.extend(chunk)
+        try:payload = product_banners.ProductBannerInput.model_validate_json(body)
+        except ValueError:raise HTTPException(422,'Confira o produto, enquadramento e arquivo do banner.') from None
+        service = await panel.service(service_id)
+        data,mime = await asyncio.to_thread(banners.validate_image,payload.image)
+        return product_banners.save(panel.store,actor,service,payload,data,mime)
 
     @app.exception_handler(ValueError)
     async def invalid(_: Request, exc: ValueError):
@@ -218,8 +245,9 @@ def install_operations(app, panel, authenticated):
         if len(term)<2:
             return {"services":[],"hasMore":False}
         items = []
+        banner_rows = product_banners.metadata(panel.store)
         for service in await panel.catalog():
-            item = service_json(service,panel.settings.price_multiplier,panel.retail_rate(service))
+            item = service_json(service,panel.settings.price_multiplier,panel.retail_rate(service),banner_rows)
             if all(word in f"{item['displayName']} {service.platform} {service.id} {service.family}".casefold() for word in term.split()):
                 items.append(item)
                 if len(items)>30:

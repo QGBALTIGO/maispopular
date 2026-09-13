@@ -83,6 +83,11 @@ def main() -> None:
         assert 'id="reviewsSection"' not in page.text
         assert 'id="welcomeText"' not in page.text
         assert 'id="manageBanners"' in page.text
+        assert 'id="manageProductBanners"' in page.text
+        product_banners=client.get('/api/admin/product-banners',headers=headers)
+        product_banners.raise_for_status()
+        assert product_banners.json()['services']
+        assert all('banner' in s for s in streaming.json()['services'])
         banners=client.get('/api/banners',headers=headers)
         banners.raise_for_status()
         assert len(banners.json()['banners'])==3

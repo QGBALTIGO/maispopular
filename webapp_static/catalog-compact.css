@@ -23,6 +23,85 @@
 .fit-contain {
   object-fit: contain !important;
 }
+.product-art.custom-product-art {
+  display: block;
+  padding: 0;
+  aspect-ratio: 16/9;
+  height: auto;
+  background: #03070e;
+  overflow: hidden;
+}
+.product-art.custom-product-art > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 16/9;
+  max-height: none;
+  border-radius: 0;
+  transform: none;
+}
+.product-banner-preview {
+  width: 100%;
+  max-width: 280px;
+  margin: 16px auto 24px;
+}
+.product-banner-list {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.product-banner-option {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.product-banner-option[aria-pressed="true"] {
+  border-color: var(--blue);
+}
+.product-banner-option > span {
+  min-width: 0;
+}
+.product-banner-option strong,
+.product-banner-option small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.product-banner-option small {
+  margin-top: 5px;
+  color: var(--muted);
+}
+.product-banner-option .brand-icon {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+}
+#productBannersAdmin select,
+#productBannersAdmin input {
+  width: 100%;
+  max-width: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+#productBannerForm {
+  scroll-margin-top: 80px;
+}
+#productBannersAdmin button,
+#productBannersAdmin input,
+#productBannersAdmin select {
+  scroll-margin-block: 90px;
+}
+.service-card > .custom-product-art {
+  width: 100%;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
 .fit-cover {
   object-fit: cover !important;
 }

@@ -5,6 +5,8 @@ import hashlib
 import hmac
 import json
 import time
+import re
+import product_banners
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from decimal import Decimal
@@ -86,7 +88,7 @@ class QuoteInput(BaseModel):
     answer: str | None = Field(default=None, max_length=6)
 
 
-def service_json(item, multiplier: Decimal, retail_rate: Decimal | None = None) -> dict:
+def service_json(item, multiplier: Decimal, retail_rate: Decimal | None = None, banner_rows=None) -> dict:
     from pricing import unit_label
     raw_retail_rate = item.rate * multiplier if retail_rate is None else retail_rate
     unit = raw_retail_rate if item.kind.casefold() == "package" else raw_retail_rate / 1000
@@ -104,6 +106,7 @@ def service_json(item, multiplier: Decimal, retail_rate: Decimal | None = None) 
         "unitPrice": format(unit,"f"), "unitPriceLabel": unit_label(unit),
         "refill": item.refill,
         "cancel": item.cancel,
+        "banner": product_banners.artwork(item, banner_rows or {}),
         **presentation(item),
     }
 
@@ -140,7 +143,7 @@ def create_app(panel: Panel, *, own_resources: bool = False) -> FastAPI:
         except ValueError:
             body_size = 16_385
         from banners import MAX_BODY
-        banner_upload = request.method == 'POST' and request.url.path in {f'/api/admin/banners/{s}' for s in (1,2,3)}
+        banner_upload = request.method == 'POST' and (request.url.path in {f'/api/admin/banners/{s}' for s in (1,2,3)} or re.fullmatch(r'/api/admin/product-banners/[1-9][0-9]{0,18}', request.url.path))
         if body_size > (MAX_BODY if banner_upload else 16_384):
             return JSONResponse({"detail": "Requisição muito grande."}, status_code=413)
         response = await call_next(request)
@@ -217,8 +220,9 @@ def create_app(panel: Panel, *, own_resources: bool = False) -> FastAPI:
         if not services:
             raise HTTPException(404, "Esta rede não está mais disponível.")
         families = sorted({s.family for s in services}, key=family_sort_key)
+        banner_rows = product_banners.metadata(panel.store)
         return {"platform": platform, "families": families,
-                "services": [service_json(s, panel.settings.price_multiplier, panel.retail_rate(s)) for s in services]}
+                "services": [service_json(s, panel.settings.price_multiplier, panel.retail_rate(s), banner_rows) for s in services]}
 
     @app.post("/api/quote")
     async def quote(payload: QuoteInput, init_data: Annotated[str, Header(alias="X-Telegram-Init-Data", max_length=8192)]):
