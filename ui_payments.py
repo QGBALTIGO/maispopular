@@ -30,7 +30,7 @@ async def deposit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     presets = sorted(p.settings.cakto_offers)
     rows = [[btn(money_brl(value), f"deposit_amount:{value}") for value in presets[i:i + 2]]
             for i in range(0, len(presets), 2)]
-    rows += [[btn("👛 Minha carteira", "balance"), btn("🏠 Início", "home")]]
+    rows += [[btn("💳 Minha carteira", "balance"), btn("🏠 Início", "home")]]
     await say(update,
         f"💳 <b>Adicionar saldo via Pix</b>\n\n"
         f"Escolha uma opção entre <b>{money_brl(minimum)}</b> e <b>{money_brl(maximum)}</b>.\n\n"
@@ -118,7 +118,7 @@ async def payment_page(update: Update, context: ContextTypes.DEFAULT_TYPE, token
         rows.append([btn("🔄 Já paguei · verificar", f"payment_refresh:{token}")])
         if row["checkout_url"].startswith("https://pay.cakto.com.br/"):
             rows.append([Button("🔗 Abrir página do Pix", url=row["checkout_url"])])
-    rows.append([btn("👛 Minha carteira", "balance"), btn("🏠 Início", "home")])
+    rows.append([btn("💳 Minha carteira", "balance"), btn("🏠 Início", "home")])
     await say(update, text, rows)
     if refresh and row["status"] in {"PAID", "REVERSED", "FAILED"}:
         p.store.payment_notified(row["id"], row["provider_status"])

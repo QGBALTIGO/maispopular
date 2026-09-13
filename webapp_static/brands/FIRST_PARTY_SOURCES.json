@@ -1,0 +1,50 @@
+{
+  "kwai": {
+    "file": "kwai.png",
+    "source": "https://cdn-static.kwai.net/kos/s101/nlav11312/kwai-www-resource/icon/Kwai-Account-Logo.png",
+    "website": "https://www.kwai.com/pt-BR/brand-resource"
+  },
+  "snackvideo": {
+    "file": "snackvideo.png",
+    "source": "https://cdn-static.kwai.net/kos/s101/nlav11312/icon/snack/2/favicon.ico",
+    "website": "https://www.snackvideo.com"
+  },
+  "capcut": {
+    "file": "capcut.ico",
+    "source": "https://sf16-web-tos-buz.capcutstatic.com/obj/capcut-web-buz-sg/common/images/lv_web-2.ico",
+    "website": "https://www.capcut.com"
+  },
+  "globoplay": {
+    "file": "globoplay.png",
+    "source": "https://s3.glbimg.com/v1/AUTH_c7def7ff66fe4b13beac0810ffbf780f/secure/apple-touch-icon-31e0f60.png",
+    "website": "https://globoplay.globo.com"
+  },
+  "rakutenviki": {
+    "file": "rakutenviki.png",
+    "source": "https://1.viki.io/a/vwk8s-svelte/_app/immutable/assets/apple-touch-icon-192x192.DaKB6Rfm.png",
+    "website": "https://www.viki.com"
+  },
+  "brainly": {
+    "file": "brainly.jpg",
+    "source": "https://play-lh.googleusercontent.com/bFpEZYugv6Fq64OkSaX3pnaz0ytvV0pu-GV8cSm6h9UqmSiWfrsJWccFZNwzDJWa5NfCrHvSfcDDC58hsBQ35A=s0-br30",
+    "website": "https://play.google.com/store/apps/details?id=co.brainly&hl=pt_BR"
+  },
+  "qconcursos": {
+    "file": "qconcursos.jpg",
+    "source": "https://play-lh.googleusercontent.com/PFVabPUwNQOIpr6ZX94xGxus83lX98mnB-tAEVjnwWOpfL08jygEkYYeshVNmJIYqDA_KNJYTzm4UkXawZay=s0-br30",
+    "website": "https://play.google.com/store/apps/details?id=com.qconcursos.QCX&hl=pt_BR"
+  },
+  "premiere": {
+    "file": "premiere.ico",
+    "source": "https://s3.glbimg.com/v1/AUTH_36abb2af534644878388f516c38b89ac/prod/premiere_favicon-e363ba60.ico",
+    "website": "https://premiere.globo.com"
+  },
+  "disneyplus": {
+    "file": "disneyplus.svg",
+    "source": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/disney-plus.svg"
+  },
+  "xbox": {
+    "file": "xbox.svg",
+    "source": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/xbox.svg"
+  }
+}

@@ -1,7 +1,7 @@
 """Vitrine pública organizada por plataforma."""
 import time
 
-from telegram import Update
+from telegram import InlineKeyboardButton, Update
 from telegram.ext import ContextTypes
 
 from domain import family_sort_key, money_brl, normalize, platform_sort_key
@@ -17,7 +17,7 @@ async def home(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await say(update,
         f"<b>Bem-vindo à {e(p.settings.bot_name)}, {e(name)}!</b>\n\n"
         "Escolha uma rede social, confira os detalhes e acompanhe tudo pelo próprio bot.\n\n"
-        f"👛 <b>Seu saldo:</b> {money_brl(balance)}",
+        f"💳 <b>Seu saldo:</b> {money_brl(balance)}",
         home_rows(p.is_admin(uid(update)), p.settings.webapp_url()))
 
 
@@ -27,6 +27,10 @@ async def identity(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def help_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    admins = sorted(panel(context).settings.admin_ids)
+    rows = ([[InlineKeyboardButton("💬 Falar com atendimento", url=f"tg://user?id={admins[0]}")]]
+            if admins else [])
+    rows.append([btn("🏠 Início", "home")])
     await say(update,
         "❓ <b>Como comprar</b>\n\n"
         "1️⃣ Adicione saldo por Pix.\n"
@@ -38,7 +42,7 @@ async def help_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/start — início\n/catalogo — redes sociais\n/buscar — localizar serviço\n"
         "/saldo — carteira\n/recarga — adicionar saldo\n/pedidos — acompanhar pedidos\n"
         "/cancelar — descartar preenchimento atual",
-        [[btn("🏠 Início", "home")]])
+        rows)
 
 
 async def balance_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -50,7 +54,7 @@ async def balance_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         sign = "+" if row["amount_cents"] >= 0 else "−"
         history.append(f"{sign} {money_brl(abs(row['amount_cents']) / 100)} · {e(row['description'])}")
     await say(update,
-        f"👛 <b>Minha carteira</b>\n\n💰 Saldo disponível: <b>{money_brl(balance)}</b>\n\n"
+        f"💳 <b>Minha carteira</b>\n\n💰 Saldo disponível: <b>{money_brl(balance)}</b>\n\n"
         + ("<b>Últimas movimentações</b>\n" + "\n".join(history) if history else "Nenhuma movimentação ainda."),
         [[btn("💳 Adicionar saldo", "deposit")],
          [btn("🔄 Atualizar", "balance"), btn("🏠 Início", "home")]])
@@ -65,7 +69,7 @@ async def catalog_page(update: Update, context: ContextTypes.DEFAULT_TYPE, page:
     rows = [buttons[index:index + 2] for index in range(0, len(buttons), 2)]
     rows += [[btn("🔎 Buscar serviço", "search_prompt"), btn("🏠 Início", "home")]]
     await say(update,
-        f"🛍️ <b>Catálogo</b>\n\n{len(services)} serviços disponíveis em {len(platforms)} áreas.\n\n"
+        f"📋 <b>Catálogo</b>\n\n{len(services)} serviços disponíveis em {len(platforms)} áreas.\n\n"
         "Escolha a rede ou plataforma:", rows)
 
 

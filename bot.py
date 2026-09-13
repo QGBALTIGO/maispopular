@@ -7,7 +7,13 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 
-from telegram import BotCommand, LinkPreviewOptions, MenuButtonWebApp, Update, WebAppInfo
+from telegram import (
+    BotCommand,
+    LinkPreviewOptions,
+    MenuButtonWebApp,
+    Update,
+    WebAppInfo,
+)
 from telegram import InlineKeyboardMarkup as Keyboard
 from telegram.error import TelegramError
 from telegram.ext import (
@@ -48,6 +54,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if context.args and context.args[0].casefold() == "deposit":
         await deposit_menu(update, context)
         return
+    if context.args and context.args[0].casefold() == "help":
+        await help_page(update, context)
+        return
+    if context.args and context.args[0].startswith("order_"):
+        token = context.args[0][6:]
+        if len(token) == 16 and all(c in "0123456789abcdef" for c in token):
+            await order_page(update, context, token)
+            return
     await home(update, context)
 
 
@@ -152,7 +166,7 @@ async def admin_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         f"⚠️ Pedidos a verificar: <b>{stats['unknown_orders']}</b>\n"
         f"⏳ Recargas abertas: <b>{stats['pending_payments']}</b>\n"
         f"💳 Recargas aprovadas: <b>{money_brl(stats['paid_cents'] / 100)}</b>\n"
-        f"👛 Saldo total de clientes: <b>{money_brl(stats['wallet_cents'] / 100)}</b>\n"
+        f"💳 Saldo total de clientes: <b>{money_brl(stats['wallet_cents'] / 100)}</b>\n"
         f"🏭 Capacidade operacional: <b>{e(operational_text)}</b>",
         [[btn("🔄 Atualizar", "admin"), btn("🏠 Início", "home")]])
 
@@ -235,8 +249,8 @@ async def poll_payments(context: ContextTypes.DEFAULT_TYPE) -> None:
             try:
                 await context.bot.send_message(updated["user_id"],
                     f"{status}\n\n💰 Recarga: <b>{money_brl(updated['amount_cents'] / 100)}</b>\n"
-                    f"👛 Saldo atual: <b>{money_brl(p.store.balance_cents(updated['user_id']) / 100)}</b>",
-                    parse_mode="HTML", reply_markup=Keyboard([[btn("👛 Abrir carteira", "balance")]]))
+                    f"💳 Saldo atual: <b>{money_brl(p.store.balance_cents(updated['user_id']) / 100)}</b>",
+                    parse_mode="HTML", reply_markup=Keyboard([[btn("💳 Abrir carteira", "balance")]]))
             except TelegramError:
                 LOG.warning("Atualização de pagamento não entregue.")
             else:

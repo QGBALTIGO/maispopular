@@ -47,7 +47,7 @@ async def orders_page(update: Update, context: ContextTypes.DEFAULT_TYPE, page: 
             for r in rows_data]
     if total:
         rows.append(pager("orders", page, total))
-    rows.append([btn("🛍️ Novo pedido", "catalog:0"), btn("🏠 Início", "home")])
+    rows.append([btn("📋 Novo pedido", "catalog:0"), btn("🏠 Início", "home")])
     await say(update, "📦 <b>Meus pedidos</b>\n\n" +
               (f"{total} pedido(s). Escolha um para acompanhar." if total else
                "Você ainda não fez nenhum pedido."), rows)

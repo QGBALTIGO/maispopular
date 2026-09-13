@@ -1,0 +1,197 @@
+[
+  {
+    "slug": "bluesky",
+    "title": "Bluesky",
+    "hex": "0285FF",
+    "source": "https://github.com/FortAwesome/Font-Awesome/issues/19810#issuecomment-1854999604",
+    "aliases": {
+      "aka": [
+        "bsky"
+      ]
+    }
+  },
+  {
+    "slug": "canva",
+    "title": "Canva",
+    "hex": "00C4CC",
+    "source": "https://www.canva.com"
+  },
+  {
+    "slug": "crunchyroll",
+    "title": "Crunchyroll",
+    "hex": "F47521",
+    "source": "https://www.crunchyroll.com"
+  },
+  {
+    "slug": "discord",
+    "title": "Discord",
+    "hex": "5865F2",
+    "source": "https://discord.com/branding",
+    "guidelines": "https://discord.com/branding"
+  },
+  {
+    "slug": "duolingo",
+    "title": "Duolingo",
+    "hex": "58CC02",
+    "source": "https://design.duolingo.com",
+    "guidelines": "https://design.duolingo.com"
+  },
+  {
+    "slug": "facebook",
+    "title": "Facebook",
+    "hex": "0866FF",
+    "source": "https://about.meta.com/brand/resources/facebook/logo",
+    "guidelines": "https://about.meta.com/brand/resources/facebook/logo"
+  },
+  {
+    "slug": "google",
+    "title": "Google",
+    "hex": "4285F4",
+    "source": "https://partnermarketinghub.withgoogle.com",
+    "guidelines": "https://about.google/brand-resource-center/brand-elements/",
+    "aliases": {
+      "loc": {
+        "ko-KR": "구글"
+      }
+    }
+  },
+  {
+    "slug": "hbo",
+    "title": "HBO",
+    "hex": "000000",
+    "source": "https://www.hbo.com"
+  },
+  {
+    "slug": "instagram",
+    "title": "Instagram",
+    "hex": "FF0069",
+    "source": "https://about.meta.com/brand/resources/instagram",
+    "guidelines": "https://about.meta.com/brand/resources/instagram"
+  },
+  {
+    "slug": "kick",
+    "title": "Kick",
+    "hex": "53FC19",
+    "source": "https://kick.com"
+  },
+  {
+    "slug": "linkedin",
+    "title": "LinkedIn",
+    "hex": "0A66C2",
+    "source": "https://brand.linkedin.com",
+    "guidelines": "https://brand.linkedin.com/policies"
+  },
+  {
+    "slug": "netflix",
+    "title": "Netflix",
+    "hex": "E50914",
+    "source": "https://brand.netflix.com/en/assets/brand-symbol",
+    "guidelines": "https://brand.netflix.com/en/assets/brand-symbol"
+  },
+  {
+    "slug": "nordvpn",
+    "title": "NordVPN",
+    "hex": "4687FF",
+    "source": "https://nordvpn.com/press-area/",
+    "guidelines": "https://nordvpn.com/press-area/"
+  },
+  {
+    "slug": "openai",
+    "title": "OpenAI",
+    "hex": "412991",
+    "source": "https://openai.com/brand",
+    "guidelines": "https://openai.com/brand"
+  },
+  {
+    "slug": "paramountplus",
+    "title": "Paramount+",
+    "hex": "0064FF",
+    "source": "https://www.paramount.com/brand/paramount-plus"
+  },
+  {
+    "slug": "pinterest",
+    "title": "Pinterest",
+    "hex": "BD081C",
+    "source": "https://business.pinterest.com/en/brand-guidelines",
+    "guidelines": "https://business.pinterest.com/en/brand-guidelines"
+  },
+  {
+    "slug": "primevideo",
+    "title": "Prime Video",
+    "hex": "1F2E3E",
+    "source": "https://videodirect.amazon.com/home/help?topicId=GT7W7GJBTDJW6Z8W#G8T2JFQZXPMHJLRZ",
+    "guidelines": "https://videodirect.amazon.com/home/help?topicId=GT7W7GJBTDJW6Z8W#G8T2JFQZXPMHJLRZ"
+  },
+  {
+    "slug": "roblox",
+    "title": "Roblox",
+    "hex": "000000",
+    "source": "https://www.roblox.com",
+    "guidelines": "https://en.help.roblox.com/hc/en-us/articles/115001708126-Roblox-Name-and-Logo-Community-Usage-Guidelines"
+  },
+  {
+    "slug": "soundcloud",
+    "title": "SoundCloud",
+    "hex": "FF5500",
+    "source": "https://press.soundcloud.com"
+  },
+  {
+    "slug": "spotify",
+    "title": "Spotify",
+    "hex": "1ED760",
+    "source": "https://developer.spotify.com/documentation/general/design-and-branding/#using-our-logo",
+    "guidelines": "https://developer.spotify.com/documentation/general/design-and-branding/#using-our-logo"
+  },
+  {
+    "slug": "telegram",
+    "title": "Telegram",
+    "hex": "26A5E4",
+    "source": "https://telegram.org/tour/screenshots"
+  },
+  {
+    "slug": "threads",
+    "title": "Threads",
+    "hex": "000000",
+    "source": "https://about.meta.com/brand/resources/instagram/threads",
+    "guidelines": "https://about.meta.com/brand/resources/instagram/threads"
+  },
+  {
+    "slug": "tiktok",
+    "title": "TikTok",
+    "hex": "000000",
+    "source": "https://tiktok.com"
+  },
+  {
+    "slug": "twitch",
+    "title": "Twitch",
+    "hex": "9146FF",
+    "source": "https://brand.twitch.tv",
+    "guidelines": "https://brand.twitch.tv"
+  },
+  {
+    "slug": "whatsapp",
+    "title": "WhatsApp",
+    "hex": "25D366",
+    "source": "https://about.meta.com/brand/resources/whatsapp/whatsapp-brand",
+    "guidelines": "https://about.meta.com/brand/resources/whatsapp/whatsapp-brand"
+  },
+  {
+    "slug": "x",
+    "title": "X",
+    "hex": "000000",
+    "source": "https://x.com",
+    "guidelines": "https://about.x.com/en/who-we-are/brand-toolkit",
+    "aliases": {
+      "aka": [
+        "Twitter"
+      ]
+    }
+  },
+  {
+    "slug": "youtube",
+    "title": "YouTube",
+    "hex": "FF0000",
+    "source": "https://www.youtube.com/howyoutubeworks/resources/brand-resources/#logos-icons-and-colors",
+    "guidelines": "https://www.youtube.com/howyoutubeworks/resources/brand-resources/#logos-icons-and-colors"
+  }
+]

@@ -7,6 +7,8 @@ from dataclasses import dataclass, replace
 from decimal import ROUND_UP, Decimal, InvalidOperation
 from urllib.parse import urlsplit
 
+from catalog_copy import clean_description, imported_description, subscription
+
 SUPPORTED_TYPES = {"default", "custom comments", "package", "poll"}
 TERMINAL = ("completed", "partial", "canceled", "cancelled", "refunded", "failed")
 STATUS_PT = {
@@ -138,15 +140,18 @@ def platform_sort_key(name: str) -> tuple[int, str]:
 
 
 def family_for(name: str, category: str) -> str:
-    haystack = f" {normalize(category)} {normalize(name)} "
-    for label, needles in SERVICE_FAMILIES:
-        if any(normalize(needle) in haystack for needle in needles):
-            return label
+    for text in (name, category):
+        haystack = f" {normalize(text)} "
+        for label, needles in SERVICE_FAMILIES:
+            if any(normalize(needle) in haystack for needle in needles):
+                return label
     return "Outros serviços"
 
 
 def family_sort_key(name: str) -> tuple[int, str]:
-    labels = tuple(label for label, _ in SERVICE_FAMILIES) + ("Outros serviços",)
+    labels = tuple(label for label, _ in SERVICE_FAMILIES) + (
+        "Filmes e séries", "Vídeos e música", "Criação e produtividade",
+        "Esportes", "Games", "Estudos e idiomas", "Combos", "Outros serviços")
     try:
         return labels.index(name), normalize(name)
     except ValueError:
@@ -176,13 +181,26 @@ class Service:
         rate = decimal_value(data["rate"])
         if service_id < 1 or minimum < 1 or maximum < minimum or maximum > 10**12 or rate <= 0:
             raise ValueError("Serviço com valores inválidos.")
-        name = plain(data["name"], 220)
+        name = plain(re.sub(r"\([^)]*\d+:\d+.*", "", str(data["name"])), 350)
         category = plain(data.get("category", "Outros"), 160) or "Outros"
-        platform, emoji = platform_for(name, category)
-        family = family_for(name, category)
-        description = plain(data.get("description") or "", 1200)
+        app = subscription(service_id, name, category)
+        platform, emoji = ("Streaming e Apps", "▶️") if app else platform_for(name, category)
+        family = app[3] if app else family_for(name, category)
+        source_description = data.get("description") or imported_description(service_id, str(data["name"]))
+        description = plain(clean_description(source_description), 8000)
+        if app:
+            # Full brand identity; plan conditions stay in the detail copy.
+            original_name = name
+            duration = re.search(r"(\d+)\s*dias", original_name + " " + description, re.IGNORECASE)
+            name = app[1] + (f" · {duration[1]} dias" if duration else "")
+            if "compartilhad" in original_name.casefold():
+                name += " · compartilhado"
+            elif "convite" in original_name.casefold():
+                name += " · por convite"
         if not description:
-            description = f"Serviço de {platform} com os limites e a quantidade informados abaixo."
+            description = (f"{name}. {plain(original_name.split('|', 1)[-1], 350)}. As condições detalhadas de entrega não foram informadas. "
+                           "Consulte o atendimento antes de contratar." if app else
+                           f"{name}. Confira o destino, os limites e as condições antes de confirmar.")
         return cls(service_id, name, category, str(data["type"]).strip(), rate,
                    minimum, maximum, description, capability(data.get("refill")),
                    capability(data.get("cancel")), platform, emoji, family)

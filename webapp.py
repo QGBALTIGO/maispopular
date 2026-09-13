@@ -12,11 +12,12 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import parse_qsl
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
+from catalog_copy import display_name, presentation
 from config import Settings
 from domain import family_sort_key, money_brl, platform_sort_key
 from engine import Panel
@@ -99,6 +100,7 @@ def service_json(item, multiplier: Decimal) -> dict:
         "rateLabel": money_brl(raw_retail_rate),
         "refill": item.refill,
         "cancel": item.cancel,
+        **presentation(item),
     }
 
 
@@ -180,7 +182,8 @@ def create_app(panel: Panel, *, own_resources: bool = False) -> FastAPI:
                      for name in sorted(counts, key=platform_sort_key)]
         balance = panel.store.balance_cents(int(user["id"]))
         return {
-            "user": {"id": int(user["id"]), "firstName": str(user.get("first_name", "Cliente"))[:80]},
+            "user": {"id": int(user["id"]), "firstName": str(user.get("first_name", "Cliente"))[:80],
+                     "username": str(user.get("username", ""))[:80]},
             "balance": f"{Decimal(balance) / 100:.2f}",
             "balanceLabel": money_brl(Decimal(balance) / 100),
             "platforms": platforms,
@@ -209,6 +212,31 @@ def create_app(panel: Panel, *, own_resources: bool = False) -> FastAPI:
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from None
         return public_order(row, panel.store.balance_cents(int(user["id"])))
+
+    @app.get("/api/account")
+    async def account(init_data: Annotated[str, Header(alias="X-Telegram-Init-Data", max_length=8192)]):
+        user = authenticated(init_data)
+        user_id = int(user["id"])
+        balance = panel.store.balance_cents(user_id)
+        return {"balance": f"{Decimal(balance) / 100:.2f}",
+                "balanceLabel": money_brl(Decimal(balance) / 100),
+                "movements": [{"id": row["id"], "amountCents": row["amount_cents"],
+                    "amountLabel": ("+ " if row["amount_cents"] >= 0 else "− ") + money_brl(Decimal(abs(row["amount_cents"])) / 100),
+                    "label": {"DEPOSIT": "Recarga via Pix", "ORDER": "Compra de serviço",
+                              "ORDER_REFUND": "Reembolso de pedido", "REVERSAL": "Estorno de recarga"}.get(
+                                  row["kind"].upper(), "Crédito na carteira" if row["amount_cents"] > 0 else "Débito na carteira"),
+                    "createdAt": row["created_at"]} for row in panel.store.ledger(user_id, 30)]}
+
+    @app.get("/api/orders")
+    async def orders(init_data: Annotated[str, Header(alias="X-Telegram-Init-Data", max_length=8192)],
+                     page: int = Query(default=0, ge=0, le=100000)):
+        user = authenticated(init_data)
+        rows, total = panel.store.list_orders(int(user["id"]), page, 12)
+        return {"total": total, "page": page, "hasMore": (page + 1) * 12 < total,
+                "orders": [{"id": row["id"], "serviceName": display_name(row["service_name"]),
+                            "costLabel": money_brl(row["cost"]), "state": row["state"],
+                            "status": row["provider_status"], "createdAt": row["created_at"],
+                            "target": row["target"]} for row in rows]}
 
     @app.post("/api/orders/{token}/confirm")
     async def confirm(token: str, init_data: Annotated[str, Header(alias="X-Telegram-Init-Data", max_length=8192)]):

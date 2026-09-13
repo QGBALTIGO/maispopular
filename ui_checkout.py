@@ -40,7 +40,7 @@ async def quote_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         f"🔗 Destino: <code>{e(payload['link'])}</code>\n"
         f"📦 Quantidade: <b>{quantity if quantity is not None else '1 pacote'}</b>\n"
         f"💵 Total: <b>{money_brl(row['cost'])}</b>\n"
-        f"👛 Saldo atual: {money_brl(balance)}\n"
+        f"💳 Saldo atual: {money_brl(balance)}\n"
     )
     if "answer_number" in payload:
         text += f"🗳️ Alternativa: {payload['answer_number']}\n"

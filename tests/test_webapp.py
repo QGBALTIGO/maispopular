@@ -7,8 +7,8 @@ import time
 import unittest
 from decimal import Decimal
 from pathlib import Path
-from urllib.parse import urlencode
 from unittest.mock import AsyncMock
+from urllib.parse import urlencode
 
 import httpx
 
@@ -39,7 +39,7 @@ def signed_init(user_id: int = 7, *, auth_date: int | None = None) -> str:
 def settings(path: Path) -> Settings:
     return Settings(
         bot_token=TOKEN, api_key="api", admin_ids=frozenset(), allowed_services=frozenset(),
-        db_path=path, max_order_cost=Decimal("5000"), poll_seconds=60,
+        db_path=path, max_order_cost=Decimal(5000), poll_seconds=60,
         bot_name="Mais Popular", price_multiplier=Decimal(2),
         min_deposit_brl=Decimal(20), max_deposit_brl=Decimal(200),
         cakto_client_id="client", cakto_client_secret="secret",
@@ -111,6 +111,19 @@ class WebAppRouteTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first.json()["state"], "SUBMITTED")
         self.assertEqual(second.json()["state"], "SUBMITTED")
         self.api.add.assert_awaited_once()
+
+    async def test_private_history_and_wallet_do_not_leak_other_users(self):
+        self.store.register_user(8, "other", "Other")
+        with self.store.db:
+            self.store._adjust_wallet(8, 10000, "deposit", "private-test")
+        response = await self.client.get("/api/account", headers=self.headers)
+        self.assertEqual(response.json()["balance"], "0.00")
+        self.assertEqual(response.json()["movements"], [])
+        orders = await self.client.get("/api/orders", headers=self.headers)
+        self.assertEqual(orders.json()["orders"], [])
+        self.assertEqual((await self.client.get("/api/orders?page=-1", headers=self.headers)).status_code, 422)
+        self.assertEqual((await self.client.get("/api/account", headers={"X-Telegram-Init-Data":"invalid"})).status_code, 401)
+        self.api.add.assert_not_awaited()
 
 
 if __name__ == "__main__":

@@ -1,104 +1,365 @@
 <!doctype html>
 <html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b1220">
-  <title>Mais Popular</title>
-  <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
-  <link rel="stylesheet" href="/assets/app.css">
-  <link rel="stylesheet" href="/assets/neutral.css">
-</head>
-<body>
-  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
-  <main class="shell">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f7f8fa" />
+    <title>Mais Popular • Sua loja digital</title>
+    <link rel="icon" href="/assets/logo.jpg" />
+    <link rel="stylesheet" href="/assets/app.css?v=3" />
+    <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+  </head>
+  <body>
     <header class="topbar">
-      <div class="brand-mark" aria-hidden="true">MP</div>
-      <div class="brand-copy"><strong>Mais Popular</strong><span>Serviços digitais</span></div>
-      <button id="balanceButton" class="balance" type="button" aria-label="Ver saldo">
-        <span>Saldo</span><strong id="balanceLabel">—</strong>
+      <button class="brand" id="brandHome" aria-label="Mais Popular, início">
+        <img src="/assets/logo.jpg" alt="" width="40" height="40" /><span
+          >Mais Popular<small>SUA LOJA DIGITAL</small></span
+        ></button
+      ><button
+        id="balanceButton"
+        class="balance"
+        aria-label="Abrir minha carteira"
+      >
+        <span data-icon="wallet"></span
+        ><span
+          ><small>Seu saldo</small><strong id="balanceLabel">—</strong></span
+        ><span data-icon="plus" class="balance-plus"></span>
       </button>
     </header>
-
-    <section id="loading" class="loading-card" aria-live="polite">
-      <div class="loader"></div><strong>Preparando sua loja</strong><span>Carregando catálogo e saldo...</span>
-    </section>
-
-    <section id="authError" class="state-card hidden" aria-live="assertive">
-      <div class="state-icon">!</div><h1>Abra pelo Telegram</h1>
-      <p>Por segurança, o catálogo pessoal funciona pelo botão <b>Abrir loja</b> no bot.</p>
-      <a id="openBotAuth" class="primary-link" href="https://t.me/MaisPopularBot">Abrir o bot</a>
-    </section>
-
-    <div id="app" class="hidden">
-      <section class="hero">
-        <div><span class="eyebrow">CATÁLOGO INTELIGENTE</span>
-          <h1>O que você quer impulsionar?</h1>
-          <p id="welcomeText">Escolha a rede e encontre o serviço certo sem listas gigantes.</p>
+    <main class="shell" id="main">
+      <section id="loading" class="loading" aria-live="polite">
+        <div class="skeleton skeleton-title"></div>
+        <div class="skeleton-grid">
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
         </div>
-        <div class="hero-orbit" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p>Carregando sua loja…</p>
       </section>
-
-      <nav class="steps" aria-label="Etapas do pedido">
-        <button class="step active" data-step="platforms" type="button"><i>1</i><span>Rede</span></button>
-        <span></span><button class="step" data-step="families" type="button"><i>2</i><span>Tipo</span></button>
-        <span></span><button class="step" data-step="services" type="button"><i>3</i><span>Serviço</span></button>
-        <span></span><button class="step" data-step="order" type="button"><i>4</i><span>Pedido</span></button>
-      </nav>
-
-      <section id="platforms" class="view">
-        <div class="section-heading"><div><h2>Redes sociais</h2><p id="catalogSummary"></p></div></div>
-        <div id="platformGrid" class="platform-grid"></div>
+      <section id="authError" class="empty hidden" role="alert">
+        <span data-icon="lock" class="empty-icon"></span>
+        <h1 id="errorTitle">Abra pelo Telegram</h1>
+        <p id="errorText">
+          Acesse sua loja pelo botão no bot para consultar catálogo, pedidos e
+          saldo.
+        </p>
+        <a class="primary-button" href="https://t.me/MaisPopularBot"
+          >Abrir Mais Popular</a
+        ><button id="retryBoot" class="text-button">Tentar novamente</button>
       </section>
-
-      <section id="families" class="view hidden">
-        <button class="back" data-back="platforms" type="button">← Todas as redes</button>
-        <div class="section-heading"><div><span class="eyebrow" id="familyPlatform"></span><h2>O que você procura?</h2></div></div>
-        <div id="familyGrid" class="family-grid"></div>
-      </section>
-
-      <section id="services" class="view hidden">
-        <button class="back" data-back="families" type="button">← Outros tipos</button>
-        <div class="section-heading"><div><span class="eyebrow" id="serviceContext"></span><h2>Escolha o serviço</h2></div></div>
-        <label class="search"><span aria-hidden="true">⌕</span><input id="serviceSearch" type="search" placeholder="Buscar nesta lista" autocomplete="off"></label>
-        <div id="serviceList" class="service-list"></div>
-      </section>
-
-      <section id="order" class="view hidden">
-        <button class="back" data-back="services" type="button">← Trocar serviço</button>
-        <article class="selected-service">
-          <div><span id="selectedBadge" class="service-badge"></span><h2 id="selectedName"></h2></div>
-          <p id="selectedDescription"></p>
-          <div class="service-facts"><span id="selectedLimits"></span><span id="selectedRate"></span></div>
-        </article>
-        <form id="orderForm" novalidate>
-          <label class="field"><span>Link ou @usuário</span><input id="target" maxlength="1500" required placeholder="Cole aqui o destino do serviço" autocomplete="off"></label>
-          <label id="valueField" class="field"><span id="valueLabel">Quantidade</span><input id="value" inputmode="numeric" autocomplete="off"><small id="valueHint"></small></label>
-          <label id="answerField" class="field hidden"><span>Alternativa da enquete</span><input id="answer" inputmode="numeric" maxlength="6" placeholder="Ex.: 2"></label>
-          <div class="price-card"><div><span>Valor do pedido</span><small>Calculado automaticamente</small></div><strong id="livePrice">R$ 0,00</strong></div>
-          <p class="safe-note"><span aria-hidden="true">✓</span>Nunca pedimos senha. Confira o link antes de continuar.</p>
-          <button id="reviewButton" class="primary-button" type="submit">Revisar pedido</button>
-        </form>
-      </section>
-
-      <section id="success" class="view hidden">
-        <div class="success-mark">✓</div><span class="eyebrow">PEDIDO RECEBIDO</span>
-        <h1>Tudo certo!</h1><p id="successText"></p>
-        <div class="success-actions"><button id="newOrder" class="primary-button" type="button">Fazer outro pedido</button><button id="closeApp" class="secondary-button" type="button">Fechar loja</button></div>
-      </section>
-    </div>
-  </main>
-
-  <div id="toast" class="toast hidden" role="status"></div>
-  <div id="reviewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
-    <div class="modal-backdrop" data-close-modal></div>
-    <div class="modal-card"><div class="modal-handle"></div><span class="eyebrow">CONFIRMAÇÃO</span><h2 id="reviewTitle">Revise seu pedido</h2>
-      <dl><div><dt>Serviço</dt><dd id="reviewService"></dd></div><div><dt>Destino</dt><dd id="reviewTarget"></dd></div><div><dt>Valor final</dt><dd id="reviewPrice"></dd></div><div><dt>Saldo após o pedido</dt><dd id="reviewBalance"></dd></div></dl>
-      <p id="reviewWarning" class="modal-warning hidden"></p>
-      <button id="confirmButton" class="primary-button" type="button">Confirmar e enviar</button>
-      <button class="secondary-button" data-close-modal type="button">Voltar e corrigir</button>
-    </div>
-  </div>
-  <script src="/assets/app.js" defer></script>
-</body>
+      <div id="app" class="hidden">
+        <section id="platforms" class="view">
+          <div class="page-intro">
+            <p id="welcomeText" class="greeting">Bem-vindo à Mais Popular</p>
+            <h1>O que você procura?</h1>
+            <p>Escolha uma rede. Encontre o serviço certo.</p>
+          </div>
+          <div class="section-heading">
+            <h2>Redes sociais</h2>
+            <span id="catalogSummary" class="muted"></span>
+          </div>
+          <div id="platformGrid" class="platform-grid"></div>
+          <div id="subscriptionEntry"></div>
+          <div class="reassurance">
+            <span data-icon="shield"></span>
+            <p>
+              O valor é mostrado antes de confirmar.<br /><strong
+                >Você está no controle de cada pedido.</strong
+              >
+            </p>
+          </div>
+        </section>
+        <section id="families" class="view hidden">
+          <button class="back" data-back="platforms">
+            <span data-icon="back"></span>Catálogo
+          </button>
+          <div class="context-heading">
+            <div id="familyLogo"></div>
+            <div>
+              <p class="eyebrow">ESCOLHA UMA CATEGORIA</p>
+              <h1 id="familyPlatform"></h1>
+            </div>
+          </div>
+          <p class="intro-copy">O que você quer encontrar?</p>
+          <div id="familyGrid" class="family-grid"></div>
+        </section>
+        <section id="services" class="view hidden">
+          <button class="back" data-back="families">
+            <span data-icon="back"></span>Categorias
+          </button>
+          <div class="page-intro compact">
+            <p id="serviceContext" class="greeting"></p>
+            <h1 id="serviceHeading">Escolha seu serviço</h1>
+          </div>
+          <label class="search"
+            ><span data-icon="search"></span
+            ><input
+              id="serviceSearch"
+              type="search"
+              placeholder="Buscar nome ou código"
+              autocomplete="off"
+              aria-label="Buscar serviços"
+          /></label>
+          <div class="list-toolbar">
+            <span id="resultCount"></span
+            ><select id="serviceSort" aria-label="Ordenar serviços">
+              <option value="default">Ordem do catálogo</option>
+              <option value="price">Menor preço</option>
+              <option value="name">Nome: A–Z</option>
+            </select>
+          </div>
+          <div id="serviceList" class="service-list"></div>
+        </section>
+        <section id="order" class="view hidden">
+          <button class="back" data-back="services">
+            <span data-icon="back"></span>Serviços
+          </button>
+          <article class="product-detail">
+            <div class="product-heading">
+              <div id="selectedLogo"></div>
+              <span id="selectedBadge" class="eyebrow"></span>
+            </div>
+            <h1 id="selectedName"></h1>
+            <p id="selectedSummary" class="intro-copy"></p>
+            <div id="selectedChips" class="chips"></div>
+            <div id="productWarning" class="notice hidden"></div>
+            <details class="description" open>
+              <summary>
+                Sobre este serviço<span data-icon="chevron"></span>
+              </summary>
+              <div id="selectedDescription"></div>
+            </details>
+          </article>
+          <form id="orderForm" novalidate>
+            <div class="form-heading">
+              <span class="number-badge">1</span>
+              <h2>Configure seu pedido</h2>
+            </div>
+            <label class="field"
+              ><span id="targetLabel">Link ou @usuário</span
+              ><input
+                id="target"
+                maxlength="1500"
+                required
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                placeholder="Cole o link ou informe o @usuário" /><small
+                id="targetHint"
+              ></small
+            ></label>
+            <div id="valueField" class="field">
+              <label for="value" id="valueLabel">Quantidade</label>
+              <div id="valueControl"></div>
+              <small id="valueHint"></small>
+              <div id="quantityChips" class="quantity-chips"></div>
+            </div>
+            <label id="answerField" class="field hidden"
+              ><span>Alternativa da enquete</span
+              ><input
+                id="answer"
+                inputmode="numeric"
+                maxlength="6"
+                placeholder="Ex.: 2"
+            /></label>
+            <p id="quantityError" class="field-error" aria-live="polite"></p>
+            <div class="checkout-bar">
+              <div>
+                <span>Total do pedido</span
+                ><strong id="livePrice" aria-live="polite">R$ 0,00</strong
+                ><small id="selectedRate"></small>
+              </div>
+              <button id="reviewButton" class="primary-button" type="submit">
+                Revisar<span data-icon="arrow"></span>
+              </button>
+            </div>
+            <p class="secure-caption">
+              <span data-icon="lock"></span>Você ainda não será cobrado.
+            </p>
+          </form>
+        </section>
+        <section id="wallet" class="view hidden">
+          <div class="page-intro compact">
+            <p class="greeting">Sua conta</p>
+            <h1>Minha carteira</h1>
+          </div>
+          <div class="wallet-card">
+            <div class="wallet-label">
+              <span data-icon="wallet"></span>Saldo disponível<button
+                id="refreshWallet"
+                class="icon-button"
+                aria-label="Atualizar saldo"
+              >
+                <span data-icon="refresh"></span>
+              </button>
+            </div>
+            <strong id="walletBalance">—</strong>
+            <p>Use seu saldo em qualquer serviço do catálogo.</p>
+            <button id="depositButton" class="primary-button">
+              <span data-icon="plus"></span>Adicionar saldo com Pix</button
+            ><small>Recarga a partir de R$ 20 · Pagamento pela Cakto</small>
+          </div>
+          <div class="section-heading">
+            <h2>Últimas movimentações</h2>
+            <span class="muted">Até 30 registros</span>
+          </div>
+          <div id="ledgerList" class="activity-list"></div>
+        </section>
+        <section id="orders" class="view hidden">
+          <div class="page-intro compact">
+            <p class="greeting">Seu histórico</p>
+            <h1>Meus pedidos</h1>
+            <p>Acompanhe suas compras em um só lugar.</p>
+          </div>
+          <div class="section-heading">
+            <span id="ordersCount" class="muted"></span
+            ><button id="refreshOrders" class="text-button">
+              <span data-icon="refresh"></span>Atualizar
+            </button>
+          </div>
+          <div id="ordersList" class="service-list"></div>
+          <button id="moreOrders" class="secondary-button hidden">
+            Carregar mais pedidos
+          </button>
+        </section>
+        <section id="help" class="view hidden">
+          <div class="page-intro compact">
+            <p class="greeting">Conte com a gente</p>
+            <h1>Como podemos ajudar?</h1>
+          </div>
+          <div class="faq">
+            <details open>
+              <summary>
+                Como fazer um pedido?<span data-icon="chevron"></span>
+              </summary>
+              <p>
+                Escolha a rede, a categoria e o serviço. Leia as condições,
+                preencha o destino e a quantidade. Revise o valor e confirme
+                usando seu saldo.
+              </p>
+            </details>
+            <details>
+              <summary>
+                Como adicionar saldo?<span data-icon="chevron"></span>
+              </summary>
+              <p>
+                Na Carteira, toque em Adicionar saldo com Pix. Você volta ao bot
+                para escolher um valor a partir de R$ 20 e gerar a cobrança pela
+                Cakto. Após o pagamento ser confirmado, atualize seu saldo.
+              </p>
+            </details>
+            <details>
+              <summary>
+                Quando meu pedido será entregue?<span
+                  data-icon="chevron"
+                ></span>
+              </summary>
+              <p>
+                Os prazos variam por serviço. Confira a descrição antes de
+                comprar. Em assinaturas com entrega manual, a confirmação do
+                pedido não significa que o acesso já foi entregue.
+              </p>
+            </details>
+            <details>
+              <summary>
+                Posso cancelar ou pedir reposição?<span
+                  data-icon="chevron"
+                ></span>
+              </summary>
+              <p>
+                A disponibilidade depende do serviço e do status do pedido.
+                Acesse Meus pedidos no bot para consultar as opções. Leia as
+                condições específicas de reposição antes de contratar.
+              </p>
+            </details>
+          </div>
+          <button id="openBotHelp" class="secondary-button">
+            <span data-icon="telegram"></span>Abrir atendimento no bot<span
+              data-icon="arrow"
+            ></span>
+          </button>
+          <p class="brand-disclaimer">
+            Mais Popular é uma loja independente. As marcas identificam os
+            serviços e pertencem aos seus respectivos titulares.
+          </p>
+        </section>
+        <section id="success" class="view hidden empty">
+          <span data-icon="check" class="success-mark"></span>
+          <p class="eyebrow">CONFIRMAÇÃO DO PEDIDO</p>
+          <h1 id="successTitle">Pedido recebido</h1>
+          <p id="successText"></p>
+          <button id="viewOrders" class="primary-button">
+            Acompanhar pedido</button
+          ><button id="newOrder" class="secondary-button">
+            Voltar ao catálogo
+          </button>
+        </section>
+      </div>
+    </main>
+    <nav
+      id="bottomNav"
+      class="bottom-nav hidden"
+      aria-label="Navegação principal"
+    >
+      <button data-nav="platforms" class="active" aria-current="page">
+        <span data-icon="grid"></span>Catálogo</button
+      ><button data-nav="orders">
+        <span data-icon="receipt"></span>Pedidos</button
+      ><button data-nav="wallet">
+        <span data-icon="wallet"></span>Carteira</button
+      ><button data-nav="help"><span data-icon="help"></span>Ajuda</button>
+    </nav>
+    <div id="toast" class="toast hidden" role="status"></div>
+    <dialog id="reviewModal" class="modal" aria-labelledby="reviewTitle">
+      <div class="modal-card">
+        <div class="modal-top">
+          <p class="eyebrow">ÚLTIMA ETAPA</p>
+          <button
+            data-close-modal
+            class="icon-button"
+            aria-label="Fechar revisão"
+          >
+            <span data-icon="close"></span>
+          </button>
+        </div>
+        <h2 id="reviewTitle">Está tudo certo?</h2>
+        <p>Confira os dados antes de enviar.</p>
+        <dl>
+          <div>
+            <dt>Serviço</dt>
+            <dd id="reviewService"></dd>
+          </div>
+          <div>
+            <dt>Destino</dt>
+            <dd id="reviewTarget"></dd>
+          </div>
+          <div>
+            <dt>Quantidade</dt>
+            <dd id="reviewQuantity"></dd>
+          </div>
+          <div class="review-total">
+            <dt>Total</dt>
+            <dd id="reviewPrice"></dd>
+          </div>
+          <div>
+            <dt>Saldo após a compra</dt>
+            <dd id="reviewBalance"></dd>
+          </div>
+        </dl>
+        <p id="reviewWarning" class="notice hidden"></p>
+        <button id="confirmButton" class="primary-button">
+          Confirmar e enviar</button
+        ><button id="modalDeposit" class="primary-button hidden">
+          Adicionar saldo</button
+        ><button data-close-modal class="text-button full-width">
+          Voltar e corrigir
+        </button>
+      </div>
+    </dialog>
+    <script src="/assets/app.js?v=3" defer></script>
+  </body>
 </html>
